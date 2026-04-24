@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RNOR Status Calculator — Turtle Finance</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; }
+  html { -webkit-font-smoothing: antialiased; }
+  body { background: #F7F8F9; font-family: "DM Sans", system-ui, sans-serif; }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"] { -moz-appearance: textfield; }
+  ::-webkit-scrollbar { height: 6px; }
+  ::-webkit-scrollbar-track { background: #F1F2F3; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fade-up { animation: fadeUp 0.4s ease-out both; }
+  .fade-up-1 { animation-delay: 0.05s; }
+  .fade-up-2 { animation-delay: 0.1s; }
+  .fade-up-3 { animation-delay: 0.15s; }
+  .fade-up-4 { animation-delay: 0.2s; }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+
+<template id="__bundler_thumbnail" data-bg-color="#F7F8F9">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <!-- Turtle logo simplified -->
+    <g transform="translate(360, 250) scale(0.3)">
+      <path d="M0 0 C16.17 0 32.34 0 49 0 C49 21.12 49 42.24 49 64 C120 64 120 64 121 65 C121 106 121 106 121 106 C97.24 106 73.48 106 49 106 C49 139.33 49 172.66 49 207 C72.76 207 96.52 207 121 207 C121 220.86 121 234.72 121 249 C39.5 249.5 23.19 247.9 9.69 235.5 C-1.57 223.52 -5.19 208.13 -5.11 192.11 C-5 114 -5 114 -5 114 C-21.17 114 -37.34 114 -54 114 C-54 92.14 -54 78.28 -54 64 C-5 64 -5 64 -5 64 C-5 27.47 -5 13.94 -5 0 C-5 0 0 0 0 0 Z" fill="#1D1D1D"/>
+    </g>
+    <text x="600" y="480" font-family="system-ui, sans-serif" font-size="48" font-weight="700" fill="#1D1D1D" text-anchor="middle">RNOR Calculator</text>
+    <text x="600" y="530" font-family="system-ui, sans-serif" font-size="24" font-weight="500" fill="#5A5F68" text-anchor="middle">Turtle Finance</text>
+  </svg>
+</template>
+
+
+<div id="root"></div>
+
+<script type="text/babel" src="rnor-logic.jsx"></script>
+<script type="text/babel" src="rnor-components.jsx"></script>
+
+<script type="text/babel">
+const { useState, useMemo, useEffect } = React;
+
+const SETTINGS = { compactTable: true, showPast4: true, colorBands: true };
+
+// ---------- Turtle Logo ----------
+function TurtleLogo({ height = 28 }) {
+  return (
+    <img src="assets/turtle-logo.svg" alt="Turtle" style={{ height, width: 'auto', display: 'block' }} />
+  );
+}
+
+// ---------- Summary Stat ----------
+function Stat({ label, value, accent, mono, icon }) {
+  return (
+    <div style={{
+      flex: '1 1 160px', minWidth: 140,
+      background: accent ? T.mint : T.paper,
+      border: `1.5px solid ${accent ? T.mintDark : T.border}`,
+      borderRadius: 14, padding: '16px 18px',
+      transition: 'all 0.2s',
+    }}>
+      <div style={{
+        fontSize: 11, fontWeight: 600, letterSpacing: 0.5,
+        textTransform: 'uppercase', color: accent ? '#0D5C4A' : T.muted,
+        fontFamily: font.sans, display: 'flex', alignItems: 'center', gap: 6,
+      }}>
+        {icon && <span style={{ fontSize: 14 }}>{icon}</span>}
+        {label}
+      </div>
+      <div style={{
+        fontSize: 22, fontWeight: 700, color: accent ? '#0D5C4A' : T.ink,
+        marginTop: 6,
+        fontFamily: mono ? font.mono : font.serif,
+        letterSpacing: mono ? -0.5 : 0,
+      }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Main App ----------
+function RNORCalculator() {
+  const tweaks = SETTINGS;
+
+  const [returnDate, setReturnDate] = useState('2026-08-01');
+  const [avgDays, setAvgDays] = useState(0);
+  const [ctc, setCtc] = useState(0);
+  const [passive, setPassive] = useState(0);
+  const [advancedMode, setAdvancedMode] = useState(false);
+  const [exactMode, setExactMode] = useState(false);
+  const [customDays, setCustomDays] = useState({});
+  const [trips, setTrips] = useState([]);
+
+  // Track which FYs have trip-derived days
+  const [tripFYs, setTripFYs] = useState(new Set());
+
+  useEffect(() => {
+    if (!exactMode) return;
+    const rDate = parseDate(returnDate);
+    if (!rDate) return;
+    const yor = fyEndingYear(rDate);
+    const next = {};
+    const newTripFYs = new Set();
+    for (let i = 0; i < 15; i++) {
+      const endYear = yor - 7 + i;
+      if (endYear >= yor) continue;
+      const startYear = endYear - 1;
+      const label = `FY ${String(startYear).slice(-2)}-${String(endYear).slice(-2)}`;
+      const fyStart = new Date(startYear, 3, 1);
+      const fyEnd = new Date(endYear, 2, 31);
+      let daysFromTrips = 0;
+      trips.forEach(t => {
+        const inD = parseDate(t.in);
+        const outD = parseDate(t.out);
+        if (inD && outD && outD >= inD) daysFromTrips += daysInIndiaForTrip(inD, outD, fyStart, fyEnd);
+      });
+      if (daysFromTrips > 0) {
+        next[label] = Math.min(365, daysFromTrips);
+        newTripFYs.add(label);
+      } else if (customDays[label] != null) {
+        next[label] = customDays[label];
+      }
+    }
+    const same = Object.keys(next).length === Object.keys(customDays).length &&
+      Object.keys(next).every(k => next[k] === customDays[k]);
+    if (!same) setCustomDays(next);
+    setTripFYs(newTripFYs);
+  }, [trips, returnDate, exactMode]);
+
+  useEffect(() => {
+    if (!exactMode) { setCustomDays({}); setTrips([]); setTripFYs(new Set()); }
+  }, [exactMode]);
+
+  const result = useMemo(() =>
+    calculate(returnDate, Number(avgDays)||0, Number(ctc)||0, Number(passive)||0, advancedMode, exactMode ? customDays : null),
+    [returnDate, avgDays, ctc, passive, advancedMode, exactMode, customDays]
+  );
+
+  if (!result) {
+    return <div style={{ padding: 40, fontSize: 16, color: T.muted, textAlign: 'center' }}>
+      Enter a valid return date to begin.
+    </div>;
+  }
+
+  const rnorYears = result.fys.filter(f => f.status === 'RNOR' && f.endYear >= result.yearOfReturn);
+  const firstRnor = rnorYears[0];
+  const lastRnor = rnorYears[rnorYears.length - 1];
+  const firstRor = result.fys.find(f => f.status === 'ROR' && f.endYear >= result.yearOfReturn);
+  const returnFY = result.fys.find(f => f.isReturnYear);
+
+  const proposedDate = useMemo(() => {
+    // When RNOR count is 2, use 729-day gap of first ROR FY + return date
+    if (rnorYears.length === 2 && firstRor) {
+      const gap = firstRor.past7Days - 729;
+      if (gap > 0) {
+        const newDate = new Date(result.returnDate);
+        newDate.setDate(newDate.getDate() + gap);
+        return { date: newDate, additionalRnorCount: 1 };
+      }
+    }
+    // Fallback to search
+    return findProposedDate(result.returnDate, Number(avgDays)||0, Number(ctc)||0, Number(passive)||0, advancedMode, exactMode ? customDays : null);
+  }, [result.returnDate, avgDays, ctc, passive, advancedMode, exactMode, customDays, rnorYears, firstRor]);
+  const proposedHasValue = rnorYears.length < 3 && proposedDate !== null;
+
+  const handleEditCell = (fyLabel, newDays) => {
+    setCustomDays(prev => ({ ...prev, [fyLabel]: newDays }));
+  };
+
+  const resetAll = () => {
+    setReturnDate('2026-08-01'); setAvgDays(0); setCtc(0); setPassive(0);
+    setAdvancedMode(false); setExactMode(false); setCustomDays({}); setTrips([]); setTripFYs(new Set());
+  };
+
+  // Table config
+  const showPast4 = true;
+  const compact = true;
+  const colorBands = true;
+
+  const rowLabel = {
+    position: 'sticky', left: 0, background: T.paper, zIndex: 2,
+    padding: compact ? '8px 14px' : '10px 16px',
+    fontSize: 12, fontWeight: 500, color: T.mutedDark,
+    borderBottom: `1px solid ${T.border}`,
+    whiteSpace: 'nowrap', textAlign: 'left', fontFamily: font.sans,
+  };
+
+  const cell = {
+    padding: compact ? '8px 6px' : '10px 8px',
+    fontSize: 13, textAlign: 'center',
+    borderBottom: `1px solid ${T.border}`,
+    fontFamily: font.mono, color: T.ink, minWidth: 78,
+  };
+
+  // Determine which FYs are "relevant" (from return-2 onward)
+  const relevantStart = result.yearOfReturn - 2;
+
+  return (
+    <div style={{
+      background: '#F7F8F9', minHeight: '100vh', color: T.ink, fontFamily: font.sans,
+    }}>
+      {/* Header */}
+      <div style={{
+        background: T.ink, padding: '16px 28px',
+        display: 'flex', alignItems: 'center', gap: 16,
+      }}>
+        <img src="assets/turtle-logo-white.svg" alt="Turtle" style={{ height: 26 }} />
+        <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.2)' }}></div>
+        <span style={{
+          fontSize: 15, fontWeight: 500, color: 'rgba(255,255,255,0.85)',
+          fontFamily: font.sans, letterSpacing: -0.2,
+        }}>
+          RNOR Status Calculator
+        </span>
+      </div>
+
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 20px 60px' }}>
+
+        {/* Input Section */}
+        <div className="fade-up" style={{
+          background: T.paper, borderRadius: 16, border: `1.5px solid ${T.border}`,
+          padding: '24px 24px 20px', marginBottom: 16,
+        }}>
+          <div style={{
+            fontSize: 12, fontWeight: 700, letterSpacing: 0.5,
+            textTransform: 'uppercase', color: T.muted, marginBottom: 16,
+          }}>
+            Your Details
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: 16,
+          }}>
+            <InputField label="Date of Return to India" type="date" value={returnDate} onChange={setReturnDate} />
+            <InputField label="Avg Days in India / Year" type="number" value={avgDays} onChange={setAvgDays}
+              suffix="days" disabled={exactMode} hint={exactMode ? 'Disabled in exact mode' : 'Before returning permanently'} />
+            <InputField label="Expected CTC (Post-Return)" type="number" value={ctc} onChange={setCtc} suffix="₹L" />
+            <InputField label="Passive Indian Income" type="number" value={passive} onChange={setPassive}
+              suffix="₹L" hint="Rental, dividends, interest etc." />
+          </div>
+
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 16 }}>
+            <ToggleSwitch label="Exact Days Mode" active={exactMode} onChange={setExactMode}
+              description={exactMode ? 'Edit days per FY or add trips' : 'Use avg days for all pre-return years'} />
+            <ToggleSwitch label="60-Day Rule" active={advancedMode} onChange={setAdvancedMode}
+              description={advancedMode ? '60d + 365-in-4y rule active' : 'Uses standard 182-day rule only'} />
+          </div>
+
+          {exactMode && (
+            <TripTextArea trips={trips} setTrips={setTrips} />
+          )}
+        </div>
+
+        {/* Summary Cards */}
+        <div className="fade-up fade-up-1" style={{
+          display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16,
+        }}>
+          <Stat label="Return FY" value={returnFY ? returnFY.label : '—'} mono />
+          <Stat label="RNOR Years" value={rnorYears.length} accent mono />
+          <Stat label="RNOR Period"
+            value={firstRnor && lastRnor ? `${firstRnor.label} → ${lastRnor.label}` : 'None'} mono />
+          <Stat label="First ROR" value={firstRor ? firstRor.label : '—'} mono />
+        </div>
+
+        {/* Proposed Date Card */}
+        {proposedHasValue && (
+          <div className="fade-up fade-up-2" style={{
+            background: T.mintSoft, border: `1.5px solid ${T.mint}`,
+            borderRadius: 14, padding: '16px 20px', marginBottom: 16,
+            display: 'flex', alignItems: 'center', gap: 14,
+          }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10, background: T.mint,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 18, flexShrink: 0,
+            }}>↗</div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: T.ink }}>
+                Delay return to {formatDateReadable(proposedDate.date)} for +{proposedDate.additionalRnorCount} RNOR year{proposedDate.additionalRnorCount > 1 ? 's' : ''}
+              </div>
+              <div style={{ fontSize: 12, color: T.mutedDark, marginTop: 2 }}>
+                Shifting your return date could extend your tax-optimized window
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Timeline Viz */}
+        <div className="fade-up fade-up-2" style={{
+          background: T.paper, borderRadius: 14, border: `1.5px solid ${T.border}`,
+          padding: '16px 20px', marginBottom: 16,
+        }}>
+          <div style={{
+            fontSize: 11, fontWeight: 600, letterSpacing: 0.4,
+            textTransform: 'uppercase', color: T.muted, marginBottom: 12,
+          }}>
+            Status Timeline
+          </div>
+          <TimelineViz fys={result.fys} yearOfReturn={result.yearOfReturn} />
+          <div style={{
+            display: 'flex', gap: 16, marginTop: 12, fontSize: 11, color: T.muted,
+          }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: T.nrBg, border: `1px solid ${T.border}`, display: 'inline-block' }}></span> NR
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: T.mint, display: 'inline-block' }}></span> RNOR
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: T.amberSoft, border: `1px solid ${T.amber}`, display: 'inline-block' }}></span> ROR
+            </span>
+          </div>
+        </div>
+
+        {/* Detailed Table */}
+        <div className="fade-up fade-up-3" style={{
+          background: T.paper, borderRadius: 16, border: `1.5px solid ${T.border}`,
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            padding: '14px 20px', borderBottom: `1px solid ${T.border}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            flexWrap: 'wrap', gap: 8,
+          }}>
+            <span style={{
+              fontSize: 12, fontWeight: 700, letterSpacing: 0.4,
+              textTransform: 'uppercase', color: T.mutedDark,
+            }}>
+              Residency Projection · 15 Financial Years
+            </span>
+            <span style={{ fontSize: 11, color: T.muted }}>Scroll → for all years</span>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1180 }}>
+              <thead>
+                <tr>
+                  <th style={{
+                    ...rowLabel, background: T.ink, color: 'rgba(255,255,255,0.7)',
+                    fontWeight: 600, fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase',
+                    padding: '12px 16px', borderBottom: 'none', zIndex: 3,
+                  }}>
+                    Metric
+                  </th>
+                  {result.fys.map(fy => {
+                    const isReturn = fy.isReturnYear;
+                    const isRnor = fy.status === 'RNOR' && fy.endYear >= result.yearOfReturn;
+                    return (
+                      <th key={fy.label} style={{
+                        padding: '12px 6px 10px', fontSize: 11, fontWeight: 600,
+                        color: isReturn ? T.mint : 'rgba(255,255,255,0.65)',
+                        background: T.ink, fontFamily: font.mono,
+                        letterSpacing: 0.3, minWidth: 78,
+                        borderBottom: isReturn ? `2.5px solid ${T.mint}` : isRnor ? `2.5px solid ${T.mint}55` : 'none',
+                      }}>
+                        {fy.label.replace('FY ', '')}
+                        {isReturn && (
+                          <div style={{
+                            fontSize: 8, color: T.mint, marginTop: 2,
+                            fontWeight: 700, letterSpacing: 1,
+                          }}>RETURN</div>
+                        )}
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {/* Status row FIRST for easy scanning */}
+                <tr style={{ background: T.subtle }}>
+                  <td style={{ ...rowLabel, background: T.subtle, fontWeight: 700, color: T.ink,
+                    textTransform: 'uppercase', fontSize: 11, letterSpacing: 0.5 }}>
+                    Status
+                  </td>
+                  {result.fys.map(fy => (
+                    <td key={fy.label} style={{ ...cell, background: T.subtle, padding: '12px 6px' }}>
+                      <StatusPill s={fy.status} />
+                    </td>
+                  ))}
+                </tr>
+
+                {/* Days in India */}
+                <tr>
+                  <td style={rowLabel}>
+                    Days in India
+                    {exactMode && (
+                      <span style={{
+                        display: 'inline-block', marginLeft: 8, padding: '1px 6px',
+                        background: T.mint, color: '#0D5C4A', borderRadius: 4,
+                        fontSize: 9, fontWeight: 700, verticalAlign: 'middle',
+                      }}>EDIT</span>
+                    )}
+                  </td>
+                  {result.fys.map(fy => (
+                    <td key={fy.label} style={{
+                      ...cell,
+                      background: colorBands && fy.isReturnYear ? `${T.mint}0A` : 'transparent',
+                    }}>
+                      {exactMode && fy.isPreReturn && !tripFYs.has(fy.label) ? (
+                        <EditableDaysCell value={fy.daysInIndia} onChange={n => handleEditCell(fy.label, n)} />
+                      ) : exactMode && fy.isPreReturn && tripFYs.has(fy.label) ? (
+                        <span style={{ fontWeight: 500, color: T.mintDark }} title="Calculated from trips">{fy.daysInIndia}</span>
+                      ) : (
+                        <span style={{ fontWeight: fy.isReturnYear ? 600 : 400 }}>{fy.daysInIndia}</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+
+                {/* Past 7 Years */}
+                <tr>
+                  <td style={rowLabel}>Past 7 Years</td>
+                  {result.fys.map(fy => {
+                    const under = fy.past7Days < 729;
+                    return (
+                      <td key={fy.label} style={{
+                        ...cell,
+                        color: under ? T.mintDark : T.ink,
+                        fontWeight: under ? 600 : 400,
+                      }}>
+                        {fy.past7Days}
+                        {fy.endYear >= result.yearOfReturn && (
+                          <div style={{
+                            fontSize: 9, marginTop: 2,
+                            color: under ? T.mintDark : T.amber,
+                            fontWeight: 600,
+                          }}>
+                            {under ? `${729 - fy.past7Days} under` : `+${fy.past7Days - 729}`}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+
+                {/* Past 4 Years (conditional) */}
+                {showPast4 && (
+                  <tr>
+                    <td style={rowLabel}>Past 4 Years</td>
+                    {result.fys.map(fy => (
+                      <td key={fy.label} style={{
+                        ...cell, color: T.muted,
+                        fontWeight: advancedMode && fy.past4Days >= 365 ? 600 : 400,
+                      }}>
+                        {fy.past4Days}
+                      </td>
+                    ))}
+                  </tr>
+                )}
+
+                {/* R / NR */}
+                <tr>
+                  <td style={rowLabel}>Resident?</td>
+                  {result.fys.map(fy => (
+                    <td key={fy.label} style={{
+                      ...cell,
+                      color: fy.residentStatus === 'R' ? T.ink : T.muted,
+                      fontWeight: 600,
+                    }}>
+                      {fy.residentStatus}
+                    </td>
+                  ))}
+                </tr>
+
+                {/* Prev 10yr R count */}
+                <tr>
+                  <td style={rowLabel}>R in Prev 10 Yrs</td>
+                  {result.fys.map(fy => (
+                    <td key={fy.label} style={{ ...cell, color: T.muted }}>{fy.prev10RCount}</td>
+                  ))}
+                </tr>
+
+                {/* Threshold row */}
+                <tr style={{ background: T.subtle }}>
+                  <td style={{ ...rowLabel, background: T.subtle, fontSize: 11, color: T.mutedDark }}>
+                    729-Day Gap
+                  </td>
+                  {result.fys.map(fy => {
+                    const gap = fy.past7Days - 729;
+                    const isTarget = firstRor && fy.label === firstRor.label;
+                    return (
+                      <td key={fy.label} style={{
+                        ...cell,
+                        background: isTarget ? T.amberSoft : T.subtle,
+                        color: gap > 0 ? (isTarget ? T.amber : T.muted) : T.mintDark,
+                        fontWeight: isTarget ? 700 : 400,
+                      }}>
+                        {gap > 0 ? `+${gap}` : gap === 0 ? '0' : `${gap}`}
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="fade-up fade-up-4" style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          marginTop: 20, flexWrap: 'wrap', gap: 12,
+        }}>
+          <div style={{ fontSize: 11, color: T.muted, lineHeight: 1.5, maxWidth: 500 }}>
+            This is an indicative calculator. Consult a qualified CA for tax filing.
+            RNOR status depends on days physically present in India across financial years.
+          </div>
+          <button onClick={resetAll} style={{
+            padding: '10px 20px', background: T.paper, color: T.ink,
+            border: `1.5px solid ${T.border}`, borderRadius: 10,
+            fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: font.sans,
+            transition: 'all 0.15s',
+          }}
+            onMouseOver={e => e.currentTarget.style.borderColor = T.ink}
+            onMouseOut={e => e.currentTarget.style.borderColor = T.border}
+          >
+            Reset All
+          </button>
+        </div>
+      </div>
+
+
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<RNORCalculator />);
+</script>
+</body>
+</html>
