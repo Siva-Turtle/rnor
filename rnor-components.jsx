@@ -335,13 +335,14 @@ function TripTextArea({ trips, setTrips }) {
 
       <div style={{ fontSize: 11, color: T.mutedDark, marginBottom: 8, lineHeight: 1.5 }}>
         One trip per line — <strong>arrival</strong> then <strong>departure</strong>, separated by <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 4px', borderRadius: 3, fontFamily: font.mono, fontSize: 10 }}>to</code>, two+ spaces, or tab.<br />
-        Formats: <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 4px', borderRadius: 3, fontFamily: font.mono, fontSize: 10 }}>dd-mm-yyyy</code>{' '}
+        Accepted Formats: <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 4px', borderRadius: 3, fontFamily: font.mono, fontSize: 10 }}>dd-mm-yyyy</code>{' '}
         <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 4px', borderRadius: 3, fontFamily: font.mono, fontSize: 10 }}>dd/mmm/yyyy</code>{' '}
         <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 4px', borderRadius: 3, fontFamily: font.mono, fontSize: 10 }}>dd mmm yyyy</code>{' '}
         <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 4px', borderRadius: 3, fontFamily: font.mono, fontSize: 10 }}>mmm dd, yyyy</code>{' '}
         <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 4px', borderRadius: 3, fontFamily: font.mono, fontSize: 10 }}>mmmm dd, yyyy</code>{' '}
         <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 4px', borderRadius: 3, fontFamily: font.mono, fontSize: 10 }}>yyyy-mm-dd</code>{' '}
-        · Ordinals like <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 4px', borderRadius: 3, fontFamily: font.mono, fontSize: 10 }}>7th</code> OK
+        · Ordinals like <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 4px', borderRadius: 3, fontFamily: font.mono, fontSize: 10 }}>7th</code> OK<br />
+        Instruction to AI: Extract trips to India in this format: "DD MMM, YYYY" and use "to" as separator.
       </div>
 
       <textarea
