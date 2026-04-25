@@ -230,6 +230,57 @@ function toISO(y, m, d) {
   return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 }
 
+// ---------- Copy Prompt Button ----------
+const AI_PROMPT = `I am sharing a travel history. It may be in one of these formats:
+- A travel history document issued by India (lists arrivals/departures in reverse chronological order)
+- A personal note or message describing trips in natural language (e.g. "Went to India on Dec 8, 2017")
+- Any other format describing when someone traveled to and from India
+
+Rules:
+- Extract only trips to India (ignore Mexico, UAE, or any other country)
+- A trip starts when the person arrives in India and ends when they leave India
+- If the source is an Indian travel history document (arrival/departure rows):
+  - Start from the last row and work upward
+  - Arrival = arrived in India, Departure = left India
+  - The first row (oldest) is always an Arrival — the person was outside India before that
+  - If the most recent entry is an Arrival with no Departure, mark end as "Present"
+- If the source is a personal note or natural language:
+  - "Went to India" = arrived in India
+  - "Came to USA" / "Came back" / "Returned to USA" = left India
+  - Ignore any travel that does not involve India
+
+Output format — one trip per line, no explanations, no headers:
+DD MMM, YYYY to DD MMM, YYYY
+DD MMM, YYYY to Present`;
+
+function CopyPromptButton() {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(AI_PROMPT).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+        padding: '3px 10px',
+        background: copied ? T.mintSoft : T.paper,
+        border: `1px solid ${copied ? T.mint : T.border}`,
+        borderRadius: 6, cursor: 'pointer',
+        fontSize: 11, fontWeight: 600,
+        color: copied ? T.mintDark : T.mutedDark,
+        fontFamily: font.sans,
+        transition: 'all 0.2s',
+      }}
+    >
+      {copied ? '✓ Copied!' : '⎘ Copy AI Prompt'}
+    </button>
+  );
+}
+
 // ---------- Trip Text Area ----------
 function TripTextArea({ trips, setTrips }) {
   const [text, setText] = useState('');
@@ -342,7 +393,7 @@ function TripTextArea({ trips, setTrips }) {
         <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 4px', borderRadius: 3, fontFamily: font.mono, fontSize: 10 }}>mmmm dd, yyyy</code>{' '}
         <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 4px', borderRadius: 3, fontFamily: font.mono, fontSize: 10 }}>yyyy-mm-dd</code>{' '}
         · Ordinals like <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 4px', borderRadius: 3, fontFamily: font.mono, fontSize: 10 }}>7th</code> OK<br />
-        Instruction to AI: Extract trips to India in this format: "DD MMM, YYYY" and use "to" as separator.
+        <CopyPromptButton />
       </div>
 
       <textarea
@@ -463,5 +514,5 @@ function TimelineViz({ fys, yearOfReturn }) {
 
 Object.assign(window, {
   T, font, StatusPill, InputField, ToggleSwitch, EditableDaysCell,
-  TripTextArea, TimelineViz, parseFlexDate,
+  TripTextArea, TimelineViz, parseFlexDate, CopyPromptButton,
 });
