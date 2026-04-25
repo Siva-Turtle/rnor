@@ -254,10 +254,11 @@ Rules:
   - Ignore any travel that does not involve India
 
 Output format — one trip per line, no explanations, no headers:
-```
+"""
 DD MMM, YYYY to DD MMM, YYYY
-DD MMM, YYYY to Present`;
-```
+DD MMM, YYYY to Present;
+"""
+`
 
 function CopyPromptButton() {
   const [copied, setCopied] = useState(false);
