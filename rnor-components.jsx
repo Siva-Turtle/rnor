@@ -236,6 +236,10 @@ const AI_PROMPT = `I am sharing a travel history. It may be in one of these form
 - A personal note or message describing trips in natural language (e.g. "Went to India on Dec 8, 2017")
 - Any other format describing when someone traveled to and from India
 
+Context on "A travel history document issued by India":
+- The Location Column is either From where they have come to India / to where they are going from India - this shows location of other side only 
+- lists arrivals/departures in reverse chronological order
+
 Rules:
 - Extract only trips to India (ignore Mexico, UAE, or any other country)
 - A trip starts when the person arrives in India and ends when they leave India
@@ -250,8 +254,10 @@ Rules:
   - Ignore any travel that does not involve India
 
 Output format — one trip per line, no explanations, no headers:
+```
 DD MMM, YYYY to DD MMM, YYYY
 DD MMM, YYYY to Present`;
+```
 
 function CopyPromptButton() {
   const [copied, setCopied] = useState(false);
