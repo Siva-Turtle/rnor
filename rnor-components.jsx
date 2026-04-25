@@ -231,23 +231,22 @@ function toISO(y, m, d) {
 }
 
 // ---------- Copy Prompt Button ----------
-const AI_PROMPT = `I am sharing a travel history. It may be in one of these formats:
-- A travel history document issued by India (lists arrivals/departures in reverse chronological order)
+const AI_PROMPT = `
+I am sharing a travel history. It may be in one of these formats:
+- A travel history document (lists arrivals/departures in reverse chronological order, always start from the oldest travel date)
 - A personal note or message describing trips in natural language (e.g. "Went to India on Dec 8, 2017")
-- Any other format describing when someone traveled to and from India
+- Any other format describing when someone travelled to and from India
 
-Context on "A travel history document issued by India":
-- The Location Column is either From where they have come to India / to where they are going from India - this shows location of other side only 
-- lists arrivals/departures in reverse chronological order
+Purpose:
+- I have an RNOR calculator that accepts travel dates in a specific text format
 
 Rules:
 - Extract only trips to India (ignore Mexico, UAE, or any other country)
 - A trip starts when the person arrives in India and ends when they leave India
-- If the source is an Indian travel history document (arrival/departure rows):
+- If the source is a travel history document (arrival/departure rows):
   - Start from the last row and work upward
-  - Arrival = arrived in India, Departure = left India
-  - The first row (oldest) is always an Arrival — the person was outside India before that
   - If the most recent entry is an Arrival with no Departure, mark end as "Present"
+  - If the location is a City Outside India, don't get confused, it means I arrived to that location from India (Always the other side is India)
 - If the source is a personal note or natural language:
   - "Went to India" = arrived in India
   - "Came to USA" / "Came back" / "Returned to USA" = left India
@@ -255,8 +254,10 @@ Rules:
 
 Output format — one trip per line, no explanations, no headers:
 """
-DD MMM, YYYY to DD MMM, YYYY
-DD MMM, YYYY to Present;
+Kindly Paste this in the RNOR Calculator:
+
+DD MMM YYYY to DD MMM YYYY
+DD MMM YYYY to Present
 """
 `
 
