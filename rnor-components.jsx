@@ -245,7 +245,7 @@ Rules:
 - A trip starts when the person arrives in India and ends when they leave India
 - If the source is a travel history document (arrival/departure rows):
   - Start from the last row and work upward
-  - If the most recent entry is an Arrival with no Departure, mark end as "Present"
+  - If the most recent entry is an arrival (outside India), ignore this
   - If the location is a City Outside India, don't get confused, it means I arrived to that location from India (Always the other side is India)
 - If the source is a personal note or natural language:
   - "Went to India" = arrived in India
@@ -257,7 +257,7 @@ Output format — one trip per line, no explanations, no headers:
 Kindly Paste this in the RNOR Calculator:
 
 DD MMM YYYY to DD MMM YYYY
-DD MMM YYYY to Present
+DD MMM YYYY to DD MMM YYYY
 """
 `
 
