@@ -143,6 +143,7 @@ function buildAccurateResult({
 
   avgDays,
   customDays,
+  trips,
 
   isIndianCitizen,
   isPIO,
@@ -158,6 +159,7 @@ function buildAccurateResult({
 
     avgDays,
     customDays,
+    trips,
 
     isIndianCitizen,
     isPIO,
@@ -634,7 +636,6 @@ function App() {
   const [isIndianCitizen, setIsIndianCitizen] = useState(true);
   const [leftForEmployment, setLeftForEmployment] = useState(false);
   const [isCrew, setIsCrew] = useState(false);
-  const [isVisitingIndia, setIsVisitingIndia] = useState(false);
   const [notTaxedAnywhere, setNotTaxedAnywhere] = useState(false);
   const [customDays, setCustomDays] = useState({});
 
@@ -687,10 +688,8 @@ function App() {
     ad,
     customForMode,
     isIndianCitizen,
-    isPIO,
     leftForEmployment,
     isCrew,
-    isVisitingIndia,
     incomeAbove15L,
     notTaxedAnywhere
   ]);
