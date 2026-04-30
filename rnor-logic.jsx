@@ -22,7 +22,13 @@ function daysInIndiaForTrip(tripIn, tripOut, fyStart, fyEnd) {
   return Math.round((end - start) / MS_PER_DAY) + 1;
 }
 
-function buildTimeline(returnDate, yearOfReturn, avgDays, ctc, passive, advancedMode, customDays) {
+// departureDate: the date the person LEFT India to live abroad (Date object or null)
+// Pre-departure FYs are treated as 365 days (person was living in India).
+// The departure FY itself counts days from Apr 1 of that FY to the departure date.
+// Post-departure, pre-return FYs use avgDays / customDays / trip-derived days.
+function buildTimeline(returnDate, yearOfReturn, avgDays, ctc, passive, advancedMode, customDays, departureDate) {
+  const depFyEndYear = departureDate ? fyEndingYear(departureDate) : null;
+
   const fys = [];
   for (let i = 0; i < 15; i++) {
     const endYear = yearOfReturn - 7 + i;
@@ -33,15 +39,36 @@ function buildTimeline(returnDate, yearOfReturn, avgDays, ctc, passive, advanced
 
     let days;
     if (endYear < yearOfReturn) {
-      if (customDays && customDays[label] != null) {
-        days = customDays[label];
+      if (departureDate && depFyEndYear !== null) {
+        if (endYear < depFyEndYear) {
+          // Fully pre-departure: person was living in India all year
+          days = 365;
+        } else if (endYear === depFyEndYear) {
+          // Departure FY: days from FY start (Apr 1) to departure date
+          days = Math.round((departureDate - fyStartDate) / MS_PER_DAY);
+          days = Math.max(0, Math.min(365, days));
+        } else {
+          // Post-departure, pre-return: visit days
+          if (customDays && customDays[label] != null) {
+            days = customDays[label];
+          } else {
+            days = avgDays;
+          }
+        }
       } else {
-        days = avgDays;
+        // No departure date: backward-compatible avg/custom for all pre-return years
+        if (customDays && customDays[label] != null) {
+          days = customDays[label];
+        } else {
+          days = avgDays;
+        }
       }
     } else if (endYear === yearOfReturn) {
+      // Return FY: days from return date to Mar 31
       days = Math.round((fyEndDate - returnDate) / MS_PER_DAY);
       if (days < 0) days = 0;
     } else {
+      // Post-return: living in India full time
       days = 365;
     }
 
@@ -54,12 +81,14 @@ function buildTimeline(returnDate, yearOfReturn, avgDays, ctc, passive, advanced
     });
   }
 
+  // Cumulative India days over the preceding 7 FYs (for the 729-day RNOR test)
   fys.forEach((fy, i) => {
     if (i >= 7) fy.past7Days = fys.slice(i - 7, i).reduce((a, b) => a + b.daysInIndia, 0);
     else if (i === 0) fy.past7Days = 0;
     else fy.past7Days = fys[i - 1].past7Days + fys[i - 1].daysInIndia;
   });
 
+  // Cumulative India days over the preceding 4 FYs (for 60-day Resident test)
   fys.forEach((fy, i) => {
     if (i >= 4) fy.past4Days = fys.slice(i - 4, i).reduce((a, b) => a + b.daysInIndia, 0);
     else fy.past4Days = fys.slice(0, i).reduce((a, b) => a + b.daysInIndia, 0);
@@ -71,6 +100,10 @@ function buildTimeline(returnDate, yearOfReturn, avgDays, ctc, passive, advanced
     fy.passiveIncome = passive;
   });
 
+  // Resident / NR per FY
+  // Primary rule for NRIs: 182+ days in the FY = Resident.
+  // 120-day rule applies if India-sourced income >= 15L.
+  // 60-day rule (advanced mode) if past 4 years total >= 365 days.
   fys.forEach(fy => {
     const d = fy.daysInIndia;
     const totalIncome = fy.activeIncome + fy.passiveIncome;
@@ -81,11 +114,16 @@ function buildTimeline(returnDate, yearOfReturn, avgDays, ctc, passive, advanced
     fy.residentStatus = isResident ? 'R' : 'NR';
   });
 
+  // Count R years in the preceding 10 FYs (for the "NR in 9 of 10" RNOR test)
   fys.forEach((fy, i) => {
     const slice = fys.slice(Math.max(0, i - 10), i);
     fy.prev10RCount = slice.filter(f => f.residentStatus === 'R').length;
   });
 
+  // Final status: NR / RNOR / ROR
+  // A Resident is RNOR if EITHER:
+  //   (a) They were NR in 9+ of the 10 preceding FYs (prev10RCount < 2), OR
+  //   (b) They spent <= 729 days in India across the 7 preceding FYs
   fys.forEach(fy => {
     if (fy.residentStatus === 'NR') fy.status = 'NR';
     else if (fy.prev10RCount < 2) fy.status = 'RNOR';
@@ -96,18 +134,20 @@ function buildTimeline(returnDate, yearOfReturn, avgDays, ctc, passive, advanced
   return fys;
 }
 
-function calculate(returnDateStr, avgDays, ctc, passive, advancedMode, customDays) {
+function calculate(returnDateStr, avgDays, ctc, passive, advancedMode, customDays, departureDateStr) {
   const date = parseDate(returnDateStr);
   if (!date) return null;
+  const departureDate = departureDateStr ? parseDate(departureDateStr) : null;
   const yearOfReturn = fyEndingYear(date);
-  const fys = buildTimeline(date, yearOfReturn, avgDays, ctc, passive, advancedMode, customDays);
+  const fys = buildTimeline(date, yearOfReturn, avgDays, ctc, passive, advancedMode, customDays, departureDate);
   return { fys, yearOfReturn, returnDate: date };
 }
 
-function findProposedDate(currentReturnDate, avgDays, ctc, passive, advancedMode, customDays) {
+function findProposedDate(currentReturnDate, avgDays, ctc, passive, advancedMode, customDays, departureDateStr) {
   const baseFys = calculate(
-    currentReturnDate.toISOString().split('T')[0], avgDays, ctc, passive, advancedMode, customDays
+    currentReturnDate.toISOString().split('T')[0], avgDays, ctc, passive, advancedMode, customDays, departureDateStr
   );
+  if (!baseFys) return null;
   const currentYoR = baseFys.yearOfReturn;
   const currentRnorCount = baseFys.fys.filter(f => f.status === 'RNOR' && f.endYear >= currentYoR).length;
 
@@ -115,7 +155,8 @@ function findProposedDate(currentReturnDate, avgDays, ctc, passive, advancedMode
     const newDate = new Date(currentReturnDate);
     newDate.setDate(newDate.getDate() + shift);
     const newYor = fyEndingYear(newDate);
-    const newFys = buildTimeline(newDate, newYor, avgDays, ctc, passive, advancedMode, customDays);
+    const depDate = departureDateStr ? parseDate(departureDateStr) : null;
+    const newFys = buildTimeline(newDate, newYor, avgDays, ctc, passive, advancedMode, customDays, depDate);
     const newRnorCount = newFys.filter(f => f.status === 'RNOR' && f.endYear >= newYor).length;
     if (newRnorCount > currentRnorCount) {
       return { date: newDate, additionalRnorCount: newRnorCount - currentRnorCount };
