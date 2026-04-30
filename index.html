@@ -107,6 +107,44 @@ function toISO(y, m, d) {
   return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 }
 
+function fyLabel(endYear) {
+  return `FY ${String(endYear - 1).slice(-2)}-${String(endYear).slice(-2)}`;
+}
+
+function buildApproxResult({
+  returnDate,
+  departureDate,
+  mode,
+  avgDays,
+  customDays,
+  trips
+}) {
+  const fys = calculateApproximation({
+    returnDateStr: returnDate,
+    departureDateStr: departureDate,
+    mode,
+    avgDays,
+    customDays,
+    trips,
+    incomeAbove15L: false
+  });
+
+  return {
+    yearOfReturn: fyEndingYear(parseDate(returnDate)),
+    returnDate,
+    fys
+  };
+}
+
+function formatDateReadable(dateInput) {
+  const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  return d.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
+}
+
 /* ── Parse trip text into trip objects; returns { trips, errors } ── */
 function parseTripText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
@@ -140,27 +178,42 @@ function parseTripText(text) {
 
 /* ── Optimisation helpers ── */
 function rnorCountFrom(res) {
-  // Must match the same 5-year window the main UI uses, otherwise a
-  // "3rd RNOR year" beyond year 5 tricks the optimiser into an infinite
-  // one-day-nudge loop.
   const yor = res.yearOfReturn;
   return res.fys.filter(f => f.status === 'RNOR' && f.endYear >= yor && f.endYear < yor + 5).length;
 }
-function findOpt1(baseDate, avgDays, customDays, departureDateStr) {
+
+function findOpt1(baseDate, mode, avgDays, customDays, trips, departureDateStr) {
   for (let shift = 1; shift <= 400; shift++) {
-    const d = new Date(baseDate); d.setDate(d.getDate() + shift);
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() + shift);
     const s = d.toISOString().split('T')[0];
-    const res = calculate(s, avgDays, 0, 0, false, customDays, departureDateStr);
+    const res = buildApproxResult({
+      returnDate: s,
+      departureDate: departureDateStr,
+      mode,
+      avgDays,
+      customDays,
+      trips
+    });
     if (!res) continue;
     if (rnorCountFrom(res) >= 3) return { date: d, shift, rnorCount: rnorCountFrom(res) };
   }
   return null;
 }
-function findOpt2(baseDate, avgDays, customDays, departureDateStr) {
+
+function findOpt2(baseDate, mode, avgDays, customDays, trips, departureDateStr) {
   for (let shift = 1; shift <= 500; shift++) {
-    const d = new Date(baseDate); d.setDate(d.getDate() + shift);
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() + shift);
     const s = d.toISOString().split('T')[0];
-    const res = calculate(s, avgDays, 0, 0, false, customDays, departureDateStr);
+    const res = buildApproxResult({
+      returnDate: s,
+      departureDate: departureDateStr,
+      mode,
+      avgDays,
+      customDays,
+      trips
+    });
     if (!res) continue;
     const yor = res.yearOfReturn;
     const fys = res.fys.filter(f => f.endYear >= yor && f.endYear < yor + 5);
@@ -406,6 +459,7 @@ function ExactDaysInput({ returnDate, departureDate, customDays, setCustomDays }
       Enter a return date first
     </div>
   );
+
   const yor = fyEndingYear(rDate);
   const depDate = departureDate ? parseDate(departureDate) : null;
   const depFyEndYear = depDate ? fyEndingYear(depDate) : null;
@@ -414,10 +468,11 @@ function ExactDaysInput({ returnDate, departureDate, customDays, setCustomDays }
   for (let i = 0; i < 7; i++) {
     const endYear = yor - 7 + i;
     if (endYear >= yor) continue;
-    // Skip pre-departure and departure FY — those are auto-calculated
     if (depFyEndYear && endYear <= depFyEndYear) continue;
-    const startYear = endYear - 1;
-    fys.push({ label: `FY ${String(startYear).slice(-2)}-${String(endYear).slice(-2)}` });
+    fys.push({
+      endYear,
+      label: fyLabel(endYear)
+    });
   }
 
   if (fys.length === 0) {
@@ -437,14 +492,18 @@ function ExactDaysInput({ returnDate, departureDate, customDays, setCustomDays }
       )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
         {fys.map(fy => (
-          <label key={fy.label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <label key={fy.endYear} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={{ fontSize: 10, fontWeight: 600, color: T.muted, fontFamily: F.mono }}>{fy.label}</span>
             <div style={{ display: 'flex', alignItems: 'center', border: `1.5px solid ${T.border}`, borderRadius: 8, background: T.paper }}>
-              <input type="number" min={0} max={365}
-                value={customDays[fy.label] ?? ''} placeholder="0"
+              <input
+                type="number"
+                min={0}
+                max={365}
+                value={customDays[fy.endYear] ?? ''}
+                placeholder="0"
                 onChange={e => {
                   const v = Math.min(365, Math.max(0, parseInt(e.target.value) || 0));
-                  setCustomDays(prev => ({ ...prev, [fy.label]: v }));
+                  setCustomDays(prev => ({ ...prev, [fy.endYear]: v }));
                 }}
                 style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', padding: '7px 8px', fontSize: 13, fontFamily: F.mono, color: T.ink, width: '100%' }}
                 onFocus={e => e.target.parentElement.style.borderColor = T.mint}
@@ -551,71 +610,78 @@ function App() {
   }, [mode]);
 
   /* Derive customDays from trips whenever trips update */
-  useEffect(() => {
-    if (mode !== 'trips' || trips.length === 0 || !returnDate) return;
-    const rDate = parseDate(returnDate);
-    if (!rDate) return;
-    const yor = fyEndingYear(rDate);
-    const next = {};
-    for (let i = 0; i < 15; i++) {
-      const endYear = yor - 7 + i;
-      if (endYear >= yor) continue;
-      const startYear = endYear - 1;
-      const label = `FY ${String(startYear).slice(-2)}-${String(endYear).slice(-2)}`;
-      const fyStart = new Date(startYear, 3, 1), fyEnd = new Date(endYear, 2, 31);
-      let days = 0;
-      trips.forEach(t => {
-        const inD = parseDate(t.in), outD = parseDate(t.out);
-        if (inD && outD) days += daysInIndiaForTrip(inD, outD, fyStart, fyEnd);
-      });
-      if (days > 0) next[label] = Math.min(365, days);
-    }
-    setCustomDays(next);
-  }, [trips, returnDate, mode]);
 
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [step]);
 
   const ad = mode === 'avg' ? (Number(avgDays) || 0) : 0;
-  const cd = (mode === 'exact' || mode === 'trips') ? customDays : null;
+  const customForMode = mode === 'custom' ? customDays : null;
+  const tripsForMode = mode === 'trips' ? trips : null;
 
   const result = useMemo(() => {
     if (!returnDate || !departureDate) return null;
-    return calculate(returnDate, ad, 0, 0, false, cd, departureDate);
-  }, [returnDate, departureDate, ad, cd]);
+    return buildApproxResult({
+      returnDate,
+      departureDate,
+      mode,
+      avgDays: ad,
+      customDays: customForMode,
+      trips: tripsForMode
+    });
+  }, [returnDate, departureDate, mode, ad, customForMode, tripsForMode]);
 
   const fiveYearStatus = useMemo(() => {
     if (!result) return [];
     const yor = result.yearOfReturn;
-    return result.fys.filter(f => f.endYear >= yor && f.endYear < yor + 5);
+    return result.fys
+      .filter(f => f.endYear >= yor && f.endYear < yor + 5)
+      .map(f => ({ ...f, label: fyLabel(f.endYear) }));
   }, [result]);
 
   const rnorCount = fiveYearStatus.filter(f => f.status === 'RNOR').length;
 
   const opt1 = useMemo(() => {
     if (!result || rnorCount !== 2) return null;
-    return findOpt1(result.returnDate, ad, cd, departureDate);
-  }, [result, rnorCount, ad, cd, departureDate]);
+    return findOpt1(result.returnDate, mode, ad, customForMode, tripsForMode, departureDate);
+  }, [result, rnorCount, mode, ad, customForMode, tripsForMode, departureDate]);
 
   const opt2 = useMemo(() => {
     if (!result || rnorCount > 2) return null;
-    return findOpt2(result.returnDate, ad, cd, departureDate);
-  }, [result, rnorCount, ad, cd, departureDate]);
+    return findOpt2(result.returnDate, mode, ad, customForMode, tripsForMode, departureDate);
+  }, [result, rnorCount, mode, ad, customForMode, tripsForMode, departureDate]);
 
   const opt1Statuses = useMemo(() => {
     if (!opt1) return null;
-    const res = calculate(opt1.date.toISOString().split('T')[0], ad, 0, 0, false, cd, departureDate);
+    const res = buildApproxResult({
+      returnDate: opt1.date.toISOString().split('T')[0],
+      departureDate,
+      mode,
+      avgDays: ad,
+      customDays: customForMode,
+      trips: tripsForMode
+    });
     if (!res) return null;
     const yor = res.yearOfReturn;
-    return res.fys.filter(f => f.endYear >= yor && f.endYear < yor + 4).map(f => ({ status: f.status, label: f.label.replace('FY ', '') }));
-  }, [opt1, ad, cd, departureDate]);
+    return res.fys
+      .filter(f => f.endYear >= yor && f.endYear < yor + 4)
+      .map(f => ({ status: f.status, label: fyLabel(f.endYear) }));
+  }, [opt1, mode, ad, customForMode, tripsForMode, departureDate]);
 
   const opt2Statuses = useMemo(() => {
     if (!opt2) return null;
-    const res = calculate(opt2.date.toISOString().split('T')[0], ad, 0, 0, false, cd, departureDate);
+    const res = buildApproxResult({
+      returnDate: opt2.date.toISOString().split('T')[0],
+      departureDate,
+      mode,
+      avgDays: ad,
+      customDays: customForMode,
+      trips: tripsForMode
+    });
     if (!res) return null;
     const yor = res.yearOfReturn;
-    return res.fys.filter(f => f.endYear >= yor && f.endYear < yor + 4).map(f => ({ status: f.status, label: f.label.replace('FY ', '') }));
-  }, [opt2, ad, cd, departureDate]);
+    return res.fys
+      .filter(f => f.endYear >= yor && f.endYear < yor + 4)
+      .map(f => ({ status: f.status, label: fyLabel(f.endYear) }));
+  }, [opt2, mode, ad, customForMode, tripsForMode, departureDate]);
 
   const retParsed = returnDate ? parseDate(returnDate) : null;
   const depParsed = departureDate ? parseDate(departureDate) : null;
@@ -624,8 +690,8 @@ function App() {
   const avgEmpty = mode === 'avg' && (!avgDays || avgDays === '');
   // In exact mode with a departure date, pre-departure FYs are auto-calculated,
   // so an empty customDays is valid (user may have 0 visit days while abroad).
-  const exactEmpty = mode === 'exact' && !departureDate && Object.values(customDays).filter(v => v > 0).length === 0;
-  const canProceed = !!(returnDate && retParsed && departureDate && depParsed && !dateOrderError && !avgEmpty && !exactEmpty);
+  const customEmpty = mode === 'custom' && !departureDate && Object.values(customDays).filter(v => v > 0).length === 0;
+  const canProceed = !!(returnDate && retParsed && departureDate && depParsed && !dateOrderError && !avgEmpty && !customEmpty);
 
   // opt2 proposes the pattern: [NR, RNOR, RNOR, ...] — "skip the partial year"
   // Suppress opt2 if the user's current outlook already IS that exact pattern
@@ -758,7 +824,7 @@ function App() {
                 </label>
                 <div style={{ display: 'flex', flexDirection: mobile ? 'column' : 'row', gap: 8, marginBottom: 18 }}>
                   <ModeCard icon="〜" title="Average" desc="Estimate days per year" active={mode === 'avg'} onClick={() => setMode('avg')} mobile={mobile} />
-                  <ModeCard icon="📅" title="By Year" desc="Enter each FY separately" active={mode === 'exact'} onClick={() => setMode('exact')} mobile={mobile} />
+                  <ModeCard icon="📅" title="By Year" desc="Enter each FY separately" active={mode === 'custom'} onClick={() => setMode('custom')} mobile={mobile} />
                   <ModeCard icon="✈️" title="Trip Dates" desc="Paste actual travel history" active={mode === 'trips'} onClick={() => setMode('trips')} mobile={mobile} />
                 </div>
 
@@ -862,11 +928,11 @@ function App() {
                   Year-by-Year Outlook
                 </div>
                 <div style={{ fontSize: 13, color: T.mutedDark, marginBottom: 24, lineHeight: 1.5 }}>
-                  Starting from <strong>{fiveYearStatus[0]?.label || '—'}</strong>, the financial year you return
+                  Starting from <strong>{fyLabel(fiveYearStatus[0]?.endYear) || '—'}</strong>, the financial year you return
                 </div>
                 <div style={{ display: 'flex', gap: mobile ? 6 : 12 }}>
                   {fiveYearStatus.map(fy => (
-                    <StatusBadge key={fy.label} status={fy.status} label={fy.label.replace('FY ', '')} mobile={mobile} />
+                    <StatusBadge key={fy.label} status={fy.status} label={fyLabel(fy.endYear).replace('FY ', '')} mobile={mobile} />
                   ))}
                 </div>
               </div>
