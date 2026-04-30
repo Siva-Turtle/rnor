@@ -632,7 +632,6 @@ function App() {
   const [avgDays, setAvgDays] = useState('');
   const [incomeAbove15L, setIncomeAbove15L] = useState(false);
   const [isIndianCitizen, setIsIndianCitizen] = useState(true);
-  const [isPIO, setIsPIO] = useState(false);
   const [leftForEmployment, setLeftForEmployment] = useState(false);
   const [isCrew, setIsCrew] = useState(false);
   const [isVisitingIndia, setIsVisitingIndia] = useState(false);
@@ -659,7 +658,7 @@ function App() {
 
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [step]);
 
-  const ad = mode === 'avg' ? (Number(avgDays) || 0) : 0;
+  const ad = mode === 'avg' && avgDays !== '' ? Number(avgDays) : null;
   const customForMode = mode === 'custom' ? customDays : null;
   const tripsForMode = mode === 'trips' ? trips : null;
 
@@ -672,12 +671,13 @@ function App() {
 
       avgDays: ad,
       customDays: customForMode,
+      trips: tripsForMode,
 
       isIndianCitizen,
-      isPIO,
+      isPIO: false,
       leftForEmployment,
       isCrew,
-      isVisitingIndia,
+      isVisitingIndia: false, // HARDCODED (RETURNING NRI)
       incomeAbove15L,
       notTaxedAnywhere
     });
@@ -760,7 +760,12 @@ function App() {
   const canProceed = !!(
     returnDate &&
     departureDate &&
-    !dateOrderError
+    !dateOrderError &&
+    (
+      (mode === 'avg' && avgDays !== '') ||
+      (mode === 'custom') ||
+      (mode === 'trips' && tripText.trim().length > 0)
+    )
   );
 
   // opt2 proposes the pattern: [NR, RNOR, RNOR, ...] — "skip the partial year"
@@ -961,8 +966,8 @@ function App() {
                         flex: 1,
                         padding: '10px',
                         borderRadius: 10,
-                        border: `1.5px solid ${incomeAbove15L ? T.mint : T.border}`,
-                        background: incomeAbove15L ? T.mintSoft : T.paper,
+                        border: `1.5px solid ${isIndianCitizen ? T.mint : T.border}`,
+                        background: isIndianCitizen ? T.mintSoft : T.paper,
                         fontWeight: 700,
                         cursor: 'pointer'
                       }}
@@ -976,8 +981,8 @@ function App() {
                         flex: 1,
                         padding: '10px',
                         borderRadius: 10,
-                        border: `1.5px solid ${!incomeAbove15L ? T.mint : T.border}`,
-                        background: !incomeAbove15L ? T.mintSoft : T.paper,
+                        border: `1.5px solid ${!isIndianCitizen ? T.mint : T.border}`,
+                        background: !isIndianCitizen ? T.mintSoft : T.paper,
                         fontWeight: 700,
                         cursor: 'pointer'
                       }}
@@ -988,56 +993,6 @@ function App() {
                 </div>
 
                 {/* Are you an Indian citizen? */}
-
-                {/* Are you a Person of Indian Origin (PIO)? */}
-
-                <div style={{ marginBottom: 20 }}>
-                  <label style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: T.mutedDark,
-                    letterSpacing: 0.5,
-                    display: 'block',
-                    marginBottom: 8,
-                    textTransform: 'uppercase'
-                  }}>
-                    Are you a Person of Indian Origin (PIO)?
-                  </label>
-
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <button
-                      onClick={() => setIsPIO(true)}
-                      style={{
-                        flex: 1,
-                        padding: '10px',
-                        borderRadius: 10,
-                        border: `1.5px solid ${incomeAbove15L ? T.mint : T.border}`,
-                        background: incomeAbove15L ? T.mintSoft : T.paper,
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Yes
-                    </button>
-
-                    <button
-                      onClick={() => setIsPIO(false)}
-                      style={{
-                        flex: 1,
-                        padding: '10px',
-                        borderRadius: 10,
-                        border: `1.5px solid ${!incomeAbove15L ? T.mint : T.border}`,
-                        background: !incomeAbove15L ? T.mintSoft : T.paper,
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      No
-                    </button>
-                  </div>
-                </div>
-
-                {/* Are you a Person of Indian Origin (PIO)? */}
 
                 {/* Did you leave India for employment? */}
 
@@ -1061,8 +1016,8 @@ function App() {
                         flex: 1,
                         padding: '10px',
                         borderRadius: 10,
-                        border: `1.5px solid ${incomeAbove15L ? T.mint : T.border}`,
-                        background: incomeAbove15L ? T.mintSoft : T.paper,
+                        border: `1.5px solid ${leftForEmployment ? T.mint : T.border}`,
+                        background: leftForEmployment ? T.mintSoft : T.paper,
                         fontWeight: 700,
                         cursor: 'pointer'
                       }}
@@ -1076,8 +1031,8 @@ function App() {
                         flex: 1,
                         padding: '10px',
                         borderRadius: 10,
-                        border: `1.5px solid ${!incomeAbove15L ? T.mint : T.border}`,
-                        background: !incomeAbove15L ? T.mintSoft : T.paper,
+                        border: `1.5px solid ${!leftForEmployment ? T.mint : T.border}`,
+                        background: !leftForEmployment ? T.mintSoft : T.paper,
                         fontWeight: 700,
                         cursor: 'pointer'
                       }}
@@ -1111,8 +1066,8 @@ function App() {
                         flex: 1,
                         padding: '10px',
                         borderRadius: 10,
-                        border: `1.5px solid ${incomeAbove15L ? T.mint : T.border}`,
-                        background: incomeAbove15L ? T.mintSoft : T.paper,
+                        border: `1.5px solid ${isCrew ? T.mint : T.border}`,
+                        background: isCrew ? T.mintSoft : T.paper,
                         fontWeight: 700,
                         cursor: 'pointer'
                       }}
@@ -1126,8 +1081,8 @@ function App() {
                         flex: 1,
                         padding: '10px',
                         borderRadius: 10,
-                        border: `1.5px solid ${!incomeAbove15L ? T.mint : T.border}`,
-                        background: !incomeAbove15L ? T.mintSoft : T.paper,
+                        border: `1.5px solid ${!isCrew ? T.mint : T.border}`,
+                        background: !isCrew ? T.mintSoft : T.paper,
                         fontWeight: 700,
                         cursor: 'pointer'
                       }}
@@ -1138,56 +1093,6 @@ function App() {
                 </div>
 
                 {/* Are you a crew member? */}
-
-                {/* Are you visiting India? */}
-
-                <div style={{ marginBottom: 20 }}>
-                  <label style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: T.mutedDark,
-                    letterSpacing: 0.5,
-                    display: 'block',
-                    marginBottom: 8,
-                    textTransform: 'uppercase'
-                  }}>
-                    Are you visiting India?
-                  </label>
-
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <button
-                      onClick={() => setIsVisitingIndia(true)}
-                      style={{
-                        flex: 1,
-                        padding: '10px',
-                        borderRadius: 10,
-                        border: `1.5px solid ${incomeAbove15L ? T.mint : T.border}`,
-                        background: incomeAbove15L ? T.mintSoft : T.paper,
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Yes, I am just visiting.
-                    </button>
-
-                    <button
-                      onClick={() => setIsVisitingIndia(false)}
-                      style={{
-                        flex: 1,
-                        padding: '10px',
-                        borderRadius: 10,
-                        border: `1.5px solid ${!incomeAbove15L ? T.mint : T.border}`,
-                        background: !incomeAbove15L ? T.mintSoft : T.paper,
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      No, I am returning to India.
-                    </button>
-                  </div>
-                </div>
-
-                {/* Are you visiting India? */}
 
                 {/* Are you taxed in any country? */}
 
@@ -1201,7 +1106,7 @@ function App() {
                     marginBottom: 8,
                     textTransform: 'uppercase'
                   }}>
-                    Are you taxed in any country other than India?
+                    Are you a tax resident in any country outside India?
                   </label>
 
                   <div style={{ display: 'flex', gap: 10 }}>
@@ -1211,8 +1116,8 @@ function App() {
                         flex: 1,
                         padding: '10px',
                         borderRadius: 10,
-                        border: `1.5px solid ${incomeAbove15L ? T.mint : T.border}`,
-                        background: incomeAbove15L ? T.mintSoft : T.paper,
+                        border: `1.5px solid ${notTaxedAnywhere ? T.mint : T.border}`,
+                        background: notTaxedAnywhere ? T.mintSoft : T.paper,
                         fontWeight: 700,
                         cursor: 'pointer'
                       }}
@@ -1226,8 +1131,8 @@ function App() {
                         flex: 1,
                         padding: '10px',
                         borderRadius: 10,
-                        border: `1.5px solid ${!incomeAbove15L ? T.mint : T.border}`,
-                        background: !incomeAbove15L ? T.mintSoft : T.paper,
+                        border: `1.5px solid ${!notTaxedAnywhere ? T.mint : T.border}`,
+                        background: !notTaxedAnywhere ? T.mintSoft : T.paper,
                         fontWeight: 700,
                         cursor: 'pointer'
                       }}
@@ -1239,7 +1144,62 @@ function App() {
 
                 {/* Are you taxed in any country? */}
 
-                {/* Advanced Mode */}
+                <label style={{ fontSize: 11, fontWeight: 700, color: T.mutedDark, letterSpacing: 0.5, display: 'block', marginBottom: 7, textTransform: 'uppercase' }}>
+                  How do you want to enter your past India visits?
+                </label>
+                <div style={{ display: 'flex', flexDirection: mobile ? 'column' : 'row', gap: 8, marginBottom: 18 }}>
+                  <ModeCard icon="〜" title="Average" desc="Estimate days per year" active={mode === 'avg'} onClick={() => setMode('avg')} mobile={mobile} />
+                  <ModeCard icon="📅" title="By Year" desc="Enter each FY separately" active={mode === 'custom'} onClick={() => setMode('custom')} mobile={mobile} />
+                  <ModeCard icon="✈️" title="Trip Dates" desc="Paste actual travel history" active={mode === 'trips'} onClick={() => setMode('trips')} mobile={mobile} />
+                </div>
+
+                {/* Average */}
+                {mode === 'avg' && (
+                  <div style={{ animation: 'fadeUp 0.2s ease-out' }}>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: T.mutedDark, display: 'block', marginBottom: 7, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Avg. days in India per year (while living abroad)
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', border: `1.5px solid ${T.border}`, borderRadius: 11, padding: '11px 14px', background: T.paper }}>
+                      <input type="number" min={0} max={365} value={avgDays} placeholder="e.g. 30"
+                        onChange={e => setAvgDays(e.target.value)}
+                        style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 15, color: T.ink, fontFamily: F.body, width: '100%' }}
+                        onFocus={e => e.target.parentElement.style.borderColor = T.mint}
+                        onBlur={e => e.target.parentElement.style.borderColor = T.border}
+                      />
+                      <span style={{ fontSize: 11, color: T.muted, fontFamily: F.mono }}>days per year</span>
+                    </div>
+                    <div style={{ marginTop: 7, fontSize: 11, color: T.muted, lineHeight: 1.5 }}>
+                      If you're unsure, a typical NRI visiting family visits ~15–30 days a year.
+                    </div>
+                  </div>
+                )}
+
+                {/* custom */}
+                {mode === 'custom' && (
+                  <div style={{ animation: 'fadeUp 0.2s ease-out' }}>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: T.mutedDark, display: 'block', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Days in India each financial year
+                    </label>
+                    <ExactDaysInput returnDate={returnDate} departureDate={departureDate} customDays={customDays} setCustomDays={setCustomDays} />
+                  </div>
+                )}
+
+                {/* Trips */}
+                {mode === 'trips' && (
+                  <div style={{ animation: 'fadeUp 0.2s ease-out' }}>
+                    <AIPromptHelper />
+                    <FormatReference />
+                    <label style={{ fontSize: 11, fontWeight: 700, color: T.mutedDark, display: 'block', marginBottom: 7, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Paste your India trips while abroad
+                    </label>
+                    <TripTextarea
+                      text={tripText}
+                      onChange={t => { setTripText(t); setTripErrors([]); setTripParsedCount(0); }}
+                      errors={tripErrors}
+                      parsedCount={tripParsedCount}
+                    />
+                  </div>
+                )}
 
               </div>
 
