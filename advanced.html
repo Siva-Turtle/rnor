@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RNOR Status — Turtle Finance</title>
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; }
+  html { -webkit-font-smoothing: antialiased; }
+  body { font-family: "Comfortaa", ui-sans-serif, system-ui, sans-serif; background: #F7F8F9; color: #1D1D1D; min-height: 100vh; }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+  input[type="number"] { -moz-appearance: textfield; }
+  input, textarea, button { font-family: "Comfortaa", ui-sans-serif, system-ui, sans-serif; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 2px; }
+  /* Prevent black flash before React hydrates */
+  #root { background: #F7F8F9; min-height: 100vh; }
+  /* Wix embed: no chrome, transparent bg, auto-height */
+  body.wix-embed { background: transparent; }
+  body.wix-embed #root > div { background: transparent; }
+  body.wix-embed #root { background: transparent; }
+  @keyframes calcPulse { 0%,100%{opacity:.5;transform:scale(.97)} 50%{opacity:1;transform:scale(1)} }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 80 56" xmlns="http://www.w3.org/2000/svg">
+    <rect width="80" height="56" fill="#F7F8F9"/>
+    <rect x="12" y="8" width="56" height="12" rx="4" fill="#1D1D1D" opacity=".9"/>
+    <rect x="12" y="24" width="36" height="5" rx="2.5" fill="#2FDEBF" opacity=".8"/>
+    <rect x="12" y="33" width="56" height="5" rx="2.5" fill="#E5E7EB"/>
+    <rect x="12" y="42" width="44" height="5" rx="2.5" fill="#E5E7EB"/>
+  </svg>
+</template>
+<div id="root"></div>
+<script type="text/babel" src="rnor-logic.jsx"></script>
+<script type="text/babel">
+const { useState, useMemo, useEffect, useRef, useLayoutEffect } = React;
+
+/* ── Auto-resize for Wix iframe ── */
+function useAutoResize() {
+  useEffect(() => {
+    const notify = () => {
+      const h = document.documentElement.scrollHeight;
+      window.parent.postMessage({ type: 'wix-height', height: h }, '*');
+      window.parent.postMessage({ height: h }, '*'); // generic fallback
+    };
+    notify();
+    const obs = new ResizeObserver(notify);
+    obs.observe(document.body);
+    return () => obs.disconnect();
+  }, []);
+}
+
+/* ── Mobile hook ── */
+function useIsMobile() {
+  const [mobile, setMobile] = useState(() => window.innerWidth < 480);
+  useEffect(() => {
+    const fn = () => setMobile(window.innerWidth < 480);
+    window.addEventListener('resize', fn);
+    return () => window.removeEventListener('resize', fn);
+  }, []);
+  return mobile;
+}
+
+/* ── Tokens ── */
+const T = {
+  ink: '#1D1D1D', mint: '#2FDEBF', mintDark: '#1FB89D', mintSoft: '#E8FBF6',
+  paper: '#FEFEFE', muted: '#6B7280', mutedDark: '#4B5563', border: '#E5E7EB',
+  subtle: '#F7F8F9', amber: '#D97706', amberSoft: '#FEF3C7',
+  nrBg: '#F1F2F3', nrFg: '#6B7280',
+  indigo: '#4338CA', indigoSoft: '#EEF2FF', indigoBorder: '#C7D2FE',
+  teal: '#0D9488', tealSoft: '#F0FDFA', tealBorder: '#99F6E4',
+  violet: '#7C3AED', violetSoft: '#F5F3FF', violetBorder: '#DDD6FE',
+  red: '#EF4444', redSoft: '#FEF2F2', redBorder: '#FECACA',
+};
+const F = { body: '"Comfortaa", ui-sans-serif, system-ui, sans-serif', mono: '"JetBrains Mono", ui-monospace, monospace' };
+
+/* ── Date parser ── */
+function parseFlexDate(s) {
+  if (!s) return null;
+  const str = s.trim().replace(/(\d+)(st|nd|rd|th)\b/gi, '$1');
+  const mm = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12,january:1,february:2,march:3,april:4,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
+  let m;
+  m = str.match(/^(\d{1,2})[\/\-]([A-Za-z]{3,})[\/\-](\d{4})$/);
+  if (m) { const mo = mm[m[2].toLowerCase()]; if (mo) return toISO(+m[3], mo, +m[1]); }
+  m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (m) return toISO(+m[3], +m[2], +m[1]);
+  m = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (m) return toISO(+m[1], +m[2], +m[3]);
+  m = str.match(/^(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})$/);
+  if (m) { const mo = mm[m[2].toLowerCase()]; if (mo) return toISO(+m[3], mo, +m[1]); }
+  m = str.match(/^([A-Za-z]{3,})\s+(\d{1,2}),?\s+(\d{4})$/);
+  if (m) { const mo = mm[m[1].toLowerCase()]; if (mo) return toISO(+m[3], mo, +m[2]); }
+  return null;
+}
+function toISO(y, m, d) {
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+function fyLabel(endYear) {
+  return `FY ${String(endYear - 1).slice(-2)}-${String(endYear).slice(-2)}`;
+}
+
+function buildApproxResult({
+  returnDate,
+  departureDate,
+  mode,
+  avgDays,
+  customDays,
+  trips,
+  incomeAbove15L
+}) {
+  const fys = calculateApproximation({
+    returnDateStr: returnDate,
+    departureDateStr: departureDate,
+    mode,
+    avgDays,
+    customDays,
+    trips,
+    incomeAbove15L
+  });
+
+  return {
+    yearOfReturn: fyEndingYear(parseDate(returnDate)),
+    returnDate,
+    fys
+  };
+}
+
+function buildAccurateResult({
+  returnDate,
+  departureDate,
+
+  avgDays,
+  customDays,
+
+  isIndianCitizen,
+  isPIO,
+  leftForEmployment,
+  isCrew,
+  isVisitingIndia,
+  incomeAbove15L,
+  notTaxedAnywhere
+}) {
+  const fys = calculateAccurate({
+    returnDateStr: returnDate,
+    departureDateStr: departureDate,
+
+    avgDays,
+    customDays,
+
+    isIndianCitizen,
+    isPIO,
+    leftForEmployment,
+    isCrew,
+    isVisitingIndia,
+    incomeAbove15L,
+    notTaxedAnywhere
+  });
+
+  return {
+    yearOfReturn: fyEndingYear(parseDate(returnDate)),
+    returnDate,
+    fys
+  };
+}
+
+function formatDateReadable(dateInput) {
+  const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  return d.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
+}
+
+/* ── Parse trip text into trip objects; returns { trips, errors } ── */
+function parseTripText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  // Strip any header/instruction lines the AI might add
+  const dataLines = lines.filter(l => {
+    const lower = l.toLowerCase();
+    return !(lower.startsWith('kindly') || lower.startsWith('note:') || lower.startsWith('//') || lower.startsWith('#'));
+  });
+  const trips = [], errors = [];
+  dataLines.forEach((line, idx) => {
+    let parts = [];
+    if (/\s+to\s+/i.test(line)) parts = line.split(/\s+to\s+/i).map(s => s.trim());
+    else if (/\t/.test(line)) parts = line.split(/\t+/).map(s => s.trim());
+    else {
+      const gaps = []; const re = /\s{2,}/g; let m2;
+      while ((m2 = re.exec(line)) !== null) gaps.push({ idx: m2.index, len: m2[0].length });
+      if (gaps.length >= 1) {
+        const best = gaps.reduce((a, b) => b.len > a.len ? b : a, gaps[0]);
+        parts = [line.slice(0, best.idx).trim(), line.slice(best.idx + best.len).trim()];
+      } else parts = [line];
+    }
+    if (parts.length < 2) { errors.push(`Line ${idx + 1}: Need two dates — "${line}"`); return; }
+    const d1 = parseFlexDate(parts[0]), d2 = parseFlexDate(parts[1]);
+    if (!d1) { errors.push(`Line ${idx + 1}: Can't read arrival date — "${parts[0]}"`); return; }
+    if (!d2) { errors.push(`Line ${idx + 1}: Can't read departure date — "${parts[1]}"`); return; }
+    if (parseDate(d2) < parseDate(d1)) { errors.push(`Line ${idx + 1}: Departure is before arrival`); return; }
+    trips.push({ in: d1, out: d2 });
+  });
+  return { trips, errors };
+}
+
+/* ── Optimisation helpers ── */
+function rnorCountFrom(res) {
+  const yor = res.yearOfReturn;
+  return res.fys.filter(f => f.status === 'RNOR' && f.endYear >= yor && f.endYear < yor + 5).length;
+}
+
+function findOpt1(baseDate, mode, avgDays, customDays, trips, departureDateStr) {
+  for (let shift = 1; shift <= 400; shift++) {
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() + shift);
+    const s = d.toISOString().split('T')[0];
+    const res = buildApproxResult({
+      returnDate: s,
+      departureDate: departureDateStr,
+      mode,
+      avgDays,
+      customDays,
+      trips
+    });
+    if (!res) continue;
+    if (rnorCountFrom(res) >= 3) return { date: d, shift, rnorCount: rnorCountFrom(res) };
+  }
+  return null;
+}
+
+function findOpt2(baseDate, mode, avgDays, customDays, trips, departureDateStr) {
+  for (let shift = 1; shift <= 500; shift++) {
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() + shift);
+    const s = d.toISOString().split('T')[0];
+    const res = buildApproxResult({
+      returnDate: s,
+      departureDate: departureDateStr,
+      mode,
+      avgDays,
+      customDays,
+      trips
+    });
+    if (!res) continue;
+    const yor = res.yearOfReturn;
+    const fys = res.fys.filter(f => f.endYear >= yor && f.endYear < yor + 5);
+    if (fys.length >= 3 && fys[0].status === 'NR' && fys[1].status === 'RNOR' && fys[2].status === 'RNOR') {
+      return { date: d, shift };
+    }
+  }
+  return null;
+}
+
+const statusMap = {
+  NR:   { bg: T.nrBg,      fg: T.nrFg,    short: 'NR' },
+  RNOR: { bg: T.mint,      fg: '#0D5C4A', short: 'RNOR' },
+  ROR:  { bg: T.amberSoft, fg: T.amber,   short: 'ROR' },
+};
+
+/* ── Steps ── */
+function Steps({ step }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
+      {['Your Details', 'Your Status'].map((l, i) => (
+        <React.Fragment key={i}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+            <div style={{
+              width: 30, height: 30, borderRadius: '50%',
+              background: i <= step ? T.ink : T.border,
+              color: i <= step ? T.paper : T.muted,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 13, fontWeight: 700, transition: 'all 0.3s',
+            }}>{i + 1}</div>
+            <span style={{ fontSize: 10, color: i <= step ? T.ink : T.muted, fontWeight: i === step ? 700 : 400, whiteSpace: 'nowrap' }}>{l}</span>
+          </div>
+          {i === 0 && <div style={{ width: 60, height: 2, background: step > 0 ? T.ink : T.border, margin: '0 8px', marginBottom: 18, transition: 'background 0.3s' }} />}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+/* ── Mode Card ── */
+function ModeCard({ icon, title, desc, active, onClick, mobile }) {
+  return mobile ? (
+    /* Mobile: horizontal row layout */
+    <button onClick={onClick} style={{
+      width: '100%', padding: '12px 14px', textAlign: 'left',
+      display: 'flex', alignItems: 'center', gap: 12,
+      background: active ? T.mintSoft : T.paper,
+      border: `2px solid ${active ? T.mint : T.border}`,
+      borderRadius: 12, cursor: 'pointer', outline: 'none', transition: 'all 0.2s',
+      boxShadow: active ? `0 0 0 3px ${T.mint}30` : 'none',
+    }}>
+      <div style={{ fontSize: 22, flexShrink: 0 }}>{icon}</div>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: active ? '#0D5C4A' : T.ink }}>{title}</div>
+        <div style={{ fontSize: 11, color: T.muted, marginTop: 2, lineHeight: 1.4 }}>{desc}</div>
+      </div>
+      {active && <div style={{ marginLeft: 'auto', color: T.mint, fontSize: 16, flexShrink: 0 }}>✓</div>}
+    </button>
+  ) : (
+    /* Desktop: vertical card */
+    <button onClick={onClick} style={{
+      flex: '1 1 0', minWidth: 0, padding: '12px 10px 10px', textAlign: 'center',
+      background: active ? T.mintSoft : T.paper,
+      border: `2px solid ${active ? T.mint : T.border}`,
+      borderRadius: 14, cursor: 'pointer', outline: 'none', transition: 'all 0.2s',
+      boxShadow: active ? `0 0 0 3px ${T.mint}30` : 'none',
+    }}>
+      <div style={{ fontSize: 20, marginBottom: 5 }}>{icon}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: active ? '#0D5C4A' : T.ink }}>{title}</div>
+      <div style={{ fontSize: 10, color: T.muted, marginTop: 3, lineHeight: 1.4 }}>{desc}</div>
+    </button>
+  );
+}
+
+/* ── AI Helper ── */
+function AIPromptHelper() {
+  const [expanded, setExpanded] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  const prompt = `I am sharing a travel history. It may be in one of these formats:
+- A travel history document (lists arrivals/departures in reverse chronological order. Always start from the oldest travel date)
+- A personal note or message describing trips in natural language (e.g. "Went to India on Dec 8, 2017")
+- Any other format describing when I have travelled to and from India
+
+Purpose:
+- I have an RNOR calculator that accepts travel dates in a specific text format, so I want you to extract my travel dates in that specific format.
+
+Rules:
+- Extract only trips to India (ignore Mexico, UAE, or any other country)
+- A trip starts when the person arrives in India and ends when they leave India
+- If the source is a travel history document (arrival/departure rows):
+  - Start from the last row and work upward
+  - If the most recent entry is an arrival in India (which means I am currently in India), assume the departure is today for calculation purposes
+  - If the location column has a Non-Indian city, don't get confused, it means I arrived at/departed from that location (and always the other side is India, unless explicitly mentioned)
+- If the source is a personal note or natural language:
+  - "Went to India" = arrived in India
+  - "Came to USA" / "Came back" / "Returned to USA" = left India
+  - Ignore any travel that does not involve India
+
+Output format — one trip per line, no explanations, no headers:
+"""
+Kindly Paste this in the RNOR Calculator:
+
+DD-MMM-YYYY to DD-MMM-YYYY
+DD-MMM-YYYY to DD-MMM-YYYY
+"""`;
+
+  const handleCopy = (e) => {
+    e.stopPropagation();
+    const doFallback = () => {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = prompt;
+        ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch(_) {}
+      setCopied(true); setTimeout(() => setCopied(false), 2500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(prompt).then(() => {
+        setCopied(true); setTimeout(() => setCopied(false), 2500);
+      }).catch(doFallback);
+    } else { doFallback(); }
+  };
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: T.indigoSoft, border: `1.5px solid ${T.indigoBorder}`,
+        borderRadius: expanded ? '12px 12px 0 0' : 12, padding: '9px 14px', cursor: 'pointer',
+      }} onClick={() => setExpanded(e => !e)}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span style={{ fontSize: 14 }}>✨</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: T.indigo }}>Format trips using AI</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={handleCopy} style={{
+            padding: '5px 12px', background: copied ? '#10B981' : T.indigo, color: '#fff',
+            border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 700,
+            cursor: 'pointer', transition: 'background 0.2s',
+          }}>
+            {copied ? '✓ Copied' : 'Copy Prompt'}
+          </button>
+          <span style={{ fontSize: 11, color: T.indigo }}>{expanded ? '▲' : '▼'}</span>
+        </div>
+      </div>
+      {expanded && (
+        <div style={{
+          background: T.indigoSoft, border: `1.5px solid ${T.indigoBorder}`,
+          borderTop: 'none', borderRadius: '0 0 12px 12px', padding: '10px 14px 12px',
+        }}>
+          <ol style={{ paddingLeft: 18, margin: 0, fontSize: 11, color: '#5B5B8A', lineHeight: 1.9 }}>
+            <li>Click <strong>"Copy Prompt"</strong> above</li>
+            <li>Open <strong>ChatGPT</strong> or <strong>Claude</strong> and paste it</li>
+            <li>Share your travel history (passport stamps, a note, any format)</li>
+            <li>Copy the formatted output and <strong>paste it in the box below</strong></li>
+          </ol>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Date Format Reference ── */
+function FormatReference() {
+  const mobile = useIsMobile();
+  return (
+    <div style={{
+      background: '#FAFAFA', border: `1.5px solid ${T.border}`,
+      borderRadius: 12, padding: '12px 14px', marginBottom: 12,
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: T.mutedDark, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span>📋</span> Accepted formats — one trip per line
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : '1fr 1fr', gap: mobile ? '6px 0' : '4px 12px' }}>
+        {[
+          ['15-06-2019 to 28-06-2019', 'DD-MM-YYYY'],
+          ['15/Jun/2019 to 28/Jun/2019', 'DD/MMM/YYYY'],
+          ['15 Jun 2019 to 28 Jun 2019', 'DD MMM YYYY'],
+          ['June 15, 2019 to June 28, 2019', 'Month DD, YYYY'],
+        ].map(([ex, fmt]) => (
+          <div key={fmt} style={{ padding: '3px 0' }}>
+            <div style={{ fontFamily: F.mono, fontSize: mobile ? 11 : 10, color: T.ink }}>{ex}</div>
+            <div style={{ fontSize: 9, color: T.muted, marginTop: 1 }}>{fmt}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ marginTop: 8, fontSize: 10, color: T.muted }}>Ordinals like "15th", "22nd" are also fine.</div>
+    </div>
+  );
+}
+
+/* ── Trip Textarea (no parse button) ── */
+function TripTextarea({ text, onChange, errors, parsedCount }) {
+  return (
+    <div>
+      <textarea
+        value={text}
+        onChange={e => onChange(e.target.value)}
+        placeholder={"15-06-2019 to 28-06-2019\n22-12-2020 to 10-01-2021\nDec 8, 2017 to Jan 6, 2018"}
+        rows={5}
+        style={{
+          width: '100%', padding: '10px 12px', border: `1.5px solid ${errors.length > 0 ? T.red : T.border}`,
+          borderRadius: 10, fontSize: 12, fontFamily: F.mono, lineHeight: 1.8,
+          background: T.paper, color: T.ink, resize: 'vertical', outline: 'none', minHeight: 100,
+          transition: 'border-color 0.2s',
+        }}
+        onFocus={e => e.target.style.borderColor = errors.length > 0 ? T.red : T.mint}
+        onBlur={e => e.target.style.borderColor = errors.length > 0 ? T.red : T.border}
+      />
+      {/* Inline error list */}
+      {errors.length > 0 && (
+        <div style={{ marginTop: 8, padding: '10px 12px', background: T.redSoft, borderRadius: 8, border: `1px solid ${T.redBorder}` }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: T.red, marginBottom: 5 }}>
+            Fix these before continuing:
+          </div>
+          {errors.map((e, i) => (
+            <div key={i} style={{ fontSize: 11, color: T.red, lineHeight: 1.7, display: 'flex', gap: 6 }}>
+              <span style={{ opacity: 0.5 }}>•</span><span>{e}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Success hint */}
+      {parsedCount > 0 && errors.length === 0 && (
+        <div style={{ marginTop: 8, fontSize: 12, color: T.mintDark, fontWeight: 700 }}>
+          ✓ {parsedCount} trip{parsedCount !== 1 ? 's' : ''} ready
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Exact Days Grid ── */
+function ExactDaysInput({ returnDate, departureDate, customDays, setCustomDays }) {
+  const rDate = parseDate(returnDate);
+  if (!rDate) return (
+    <div style={{ fontSize: 12, color: T.muted, padding: 12, background: T.subtle, borderRadius: 8, textAlign: 'center' }}>
+      Enter a return date first
+    </div>
+  );
+
+  const yor = fyEndingYear(rDate);
+  const depDate = departureDate ? parseDate(departureDate) : null;
+  const depFyEndYear = depDate ? fyEndingYear(depDate) : null;
+
+  const fys = [];
+  for (let i = 0; i < 7; i++) {
+    const endYear = yor - 7 + i;
+    if (endYear >= yor) continue;
+    if (depFyEndYear && endYear <= depFyEndYear) continue;
+    fys.push({
+      endYear,
+      label: fyLabel(endYear)
+    });
+  }
+
+  if (fys.length === 0) {
+    return (
+      <div style={{ fontSize: 12, color: T.muted, padding: 12, background: T.subtle, borderRadius: 8, textAlign: 'center', lineHeight: 1.6 }}>
+        All years before your return are auto-calculated from your departure date.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {depFyEndYear && (
+        <div style={{ fontSize: 11, color: T.muted, marginBottom: 10, lineHeight: 1.6 }}>
+          Years before you moved abroad are auto-calculated. Enter visit days for the years below.
+        </div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
+        {fys.map(fy => (
+          <label key={fy.endYear} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 10, fontWeight: 600, color: T.muted, fontFamily: F.mono }}>{fy.label}</span>
+            <div style={{ display: 'flex', alignItems: 'center', border: `1.5px solid ${T.border}`, borderRadius: 8, background: T.paper }}>
+              <input
+                type="number"
+                min={0}
+                max={365}
+                value={customDays[fy.endYear] ?? ''}
+                placeholder="0"
+                onChange={e => {
+                  const v = Math.min(365, Math.max(0, parseInt(e.target.value) || 0));
+                  setCustomDays(prev => ({ ...prev, [fy.endYear]: v }));
+                }}
+                style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', padding: '7px 8px', fontSize: 13, fontFamily: F.mono, color: T.ink, width: '100%' }}
+                onFocus={e => e.target.parentElement.style.borderColor = T.mint}
+                onBlur={e => e.target.parentElement.style.borderColor = T.border}
+              />
+              <span style={{ fontSize: 9, color: T.muted, paddingRight: 7, fontFamily: F.mono }}>d</span>
+            </div>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Status Badge ── */
+function StatusBadge({ status, label, mobile }) {
+  const s = statusMap[status] || statusMap.NR;
+  const isRnor = status === 'RNOR';
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: mobile ? 4 : 5, flex: '1 1 0', minWidth: 0 }}>
+      <div style={{
+        width: '100%', padding: isRnor ? (mobile ? '8px 2px' : '10px 4px') : (mobile ? '6px 2px' : '7px 4px'),
+        borderRadius: mobile ? 8 : 10,
+        background: s.bg, textAlign: 'center',
+        border: `1.5px solid ${isRnor ? T.mintDark : status === 'ROR' ? T.amber : T.border}`,
+        boxShadow: isRnor ? `0 2px 8px ${T.mint}50` : 'none',
+        transform: isRnor ? 'scale(1.04)' : 'scale(1)',
+      }}>
+        <div style={{ fontSize: mobile ? 10 : (isRnor ? 13 : 12), fontWeight: 700, color: s.fg, fontFamily: F.mono, letterSpacing: 0.2 }}>{s.short}</div>
+      </div>
+      <div style={{ fontSize: mobile ? 8 : 9, color: T.muted, fontFamily: F.mono, fontWeight: 600, whiteSpace: 'nowrap' }}>{label}</div>
+    </div>
+  );
+}
+
+/* ── Optimisation Card ── */
+function OptCard({ tag, tagColor, tagBg, headline, date, subtext, miniStatuses }) {
+  return (
+    <div style={{
+      background: T.paper, border: `1.5px solid ${tagColor}40`,
+      borderRadius: 16, padding: '16px 18px', position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: tagColor, borderRadius: '16px 16px 0 0' }} />
+      <div style={{ marginBottom: 8 }}>
+        <span style={{ padding: '3px 10px', background: tagBg, color: tagColor, borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: 0.3 }}>{tag}</span>
+      </div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: T.mutedDark, marginBottom: 6, lineHeight: 1.4 }}>{headline}</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 10, color: T.muted }}>Return on</span>
+        <span style={{ fontFamily: F.mono, fontSize: 13, fontWeight: 700, color: tagColor, background: tagBg, padding: '3px 10px', borderRadius: 7 }}>{date}</span>
+      </div>
+      {miniStatuses && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          {miniStatuses.map((s, i) => {
+            const sm = statusMap[s.status] || statusMap.NR;
+            const isRnor = s.status === 'RNOR';
+            return (
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, flex: '1 1 0', minWidth: 0 }}>
+                <div style={{
+                  width: '100%',
+                  padding: isRnor ? '10px 4px' : '7px 4px',
+                  borderRadius: 10,
+                  background: sm.bg, textAlign: 'center',
+                  border: `1.5px solid ${isRnor ? T.mintDark : s.status === 'ROR' ? T.amber : T.border}`,
+                  boxShadow: isRnor ? `0 2px 8px ${T.mint}50` : 'none',
+                  transform: isRnor ? 'scale(1.04)' : 'scale(1)',
+                }}>
+                  <div style={{ fontSize: isRnor ? 13 : 12, fontWeight: 700, color: sm.fg, fontFamily: F.mono, letterSpacing: 0.2 }}>{sm.short}</div>
+                </div>
+                <div style={{ fontSize: 9, color: T.muted, fontFamily: F.mono, fontWeight: 600, whiteSpace: 'nowrap' }}>{s.label}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div style={{ fontSize: 11, color: T.mutedDark, lineHeight: 1.7 }}>{subtext}</div>
+    </div>
+  );
+}
+
+/* ── Main App ── */
+function App() {
+  const [step, setStep] = useState(0);
+  const [returnDate, setReturnDate] = useState('');
+  const [departureDate, setDepartureDate] = useState('');
+  const [mode, setMode] = useState('avg');
+  const [avgDays, setAvgDays] = useState('');
+  const [incomeAbove15L, setIncomeAbove15L] = useState(false);
+  const [isIndianCitizen, setIsIndianCitizen] = useState(true);
+  const [isPIO, setIsPIO] = useState(false);
+  const [leftForEmployment, setLeftForEmployment] = useState(false);
+  const [isCrew, setIsCrew] = useState(false);
+  const [isVisitingIndia, setIsVisitingIndia] = useState(false);
+  const [notTaxedAnywhere, setNotTaxedAnywhere] = useState(false);
+  const [customDays, setCustomDays] = useState({});
+
+  /* Trip text lives here so Calculate can access it */
+  const [tripText, setTripText] = useState('');
+  const [trips, setTrips] = useState([]);
+  const [tripErrors, setTripErrors] = useState([]);
+  const [tripParsedCount, setTripParsedCount] = useState(0);
+
+  const [animKey, setAnimKey] = useState(0);
+  const [calculating, setCalculating] = useState(false);
+  const scrollRef = useRef(null);
+  const mobile = useIsMobile();
+
+  /* Clear trip state on mode change away from trips */
+  useEffect(() => {
+    if (mode !== 'trips') { setTripErrors([]); }
+  }, [mode]);
+
+  /* Derive customDays from trips whenever trips update */
+
+  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [step]);
+
+  const ad = mode === 'avg' ? (Number(avgDays) || 0) : 0;
+  const customForMode = mode === 'custom' ? customDays : null;
+  const tripsForMode = mode === 'trips' ? trips : null;
+
+  const result = useMemo(() => {
+    if (!returnDate || !departureDate) return null;
+
+    return buildAccurateResult({
+      returnDate,
+      departureDate,
+
+      avgDays: ad,
+      customDays: customForMode,
+
+      isIndianCitizen,
+      isPIO,
+      leftForEmployment,
+      isCrew,
+      isVisitingIndia,
+      incomeAbove15L,
+      notTaxedAnywhere
+    });
+  }, [
+    returnDate,
+    departureDate,
+    ad,
+    customForMode,
+    isIndianCitizen,
+    isPIO,
+    leftForEmployment,
+    isCrew,
+    isVisitingIndia,
+    incomeAbove15L,
+    notTaxedAnywhere
+  ]);
+
+  const fiveYearStatus = useMemo(() => {
+    if (!result) return [];
+    const yor = result.yearOfReturn;
+    return result.fys
+      .filter(f => f.endYear >= yor && f.endYear < yor + 5)
+      .map(f => ({ ...f, label: fyLabel(f.endYear) }));
+  }, [result]);
+
+  const rnorCount = fiveYearStatus.filter(f => f.status === 'RNOR').length;
+
+  const opt1 = useMemo(() => {
+    if (!result || rnorCount !== 2) return null;
+    return findOpt1(result.returnDate, mode, ad, customForMode, tripsForMode, departureDate);
+  }, [result, rnorCount, mode, ad, customForMode, tripsForMode, departureDate]);
+
+  const opt2 = useMemo(() => {
+    if (!result || rnorCount > 2) return null;
+    return findOpt2(result.returnDate, mode, ad, customForMode, tripsForMode, departureDate);
+  }, [result, rnorCount, mode, ad, customForMode, tripsForMode, departureDate]);
+
+  const opt1Statuses = useMemo(() => {
+    if (!opt1) return null;
+    const res = buildApproxResult({
+      returnDate: opt1.date.toISOString().split('T')[0],
+      departureDate,
+      mode,
+      avgDays: ad,
+      customDays: customForMode,
+      trips: tripsForMode
+    });
+    if (!res) return null;
+    const yor = res.yearOfReturn;
+    return res.fys
+      .filter(f => f.endYear >= yor && f.endYear < yor + 4)
+      .map(f => ({ status: f.status, label: fyLabel(f.endYear) }));
+  }, [opt1, mode, ad, customForMode, tripsForMode, departureDate]);
+
+  const opt2Statuses = useMemo(() => {
+    if (!opt2) return null;
+    const res = buildApproxResult({
+      returnDate: opt2.date.toISOString().split('T')[0],
+      departureDate,
+      mode,
+      avgDays: ad,
+      customDays: customForMode,
+      trips: tripsForMode
+    });
+    if (!res) return null;
+    const yor = res.yearOfReturn;
+    return res.fys
+      .filter(f => f.endYear >= yor && f.endYear < yor + 4)
+      .map(f => ({ status: f.status, label: fyLabel(f.endYear) }));
+  }, [opt2, mode, ad, customForMode, tripsForMode, departureDate]);
+
+  const retParsed = returnDate ? parseDate(returnDate) : null;
+  const depParsed = departureDate ? parseDate(departureDate) : null;
+  const dateOrderError = !!(depParsed && retParsed && depParsed >= retParsed);
+
+  const avgEmpty = mode === 'avg' && (!avgDays || avgDays === '');
+  // In exact mode with a departure date, pre-departure FYs are auto-calculated,
+  // so an empty customDays is valid (user may have 0 visit days while abroad).
+  const customEmpty = mode === 'custom' && !departureDate && Object.values(customDays).filter(v => v > 0).length === 0;
+  const canProceed = !!(
+    returnDate &&
+    departureDate &&
+    !dateOrderError
+  );
+
+  // opt2 proposes the pattern: [NR, RNOR, RNOR, ...] — "skip the partial year"
+  // Suppress opt2 if the user's current outlook already IS that exact pattern
+  const alreadyCleanPattern =
+    fiveYearStatus[0]?.status === 'NR' &&
+    fiveYearStatus[1]?.status === 'RNOR' &&
+    fiveYearStatus[2]?.status === 'RNOR';
+  // Also suppress opt2 if opt1 already achieves 3 RNOR years (strictly better)
+  const showOpt2 = opt2 && !alreadyCleanPattern && !(opt1 && opt1.rnorCount >= 3);
+  const effectiveOptCount = [opt1, showOpt2 ? opt2 : null].filter(Boolean).length;
+  const showOptimisations = rnorCount <= 2 && effectiveOptCount > 0;
+  // Already optimal: either got max 3 RNOR years, or has 2 and no further improvement found
+  const alreadyOptimal = rnorCount >= 3 || (rnorCount >= 2 && !showOptimisations);
+
+  const scrollToTop = () => {
+    // Scroll within the widget
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    // Tell Wix host to scroll to top of the page
+    window.parent.postMessage({ scrollTo: 0 }, '*');
+    window.parent.postMessage({ action: 'scrollTo', y: 0 }, '*');
+  };
+
+  const handleCalculate = () => {
+    if (!canProceed) return;
+
+    /* In trip mode: parse first, block if errors */
+    if (mode === 'trips') {
+      if (!tripText.trim()) {
+        setTripErrors(['Please paste your India trips above before calculating.']);
+        return;
+      }
+      const { trips: parsed, errors } = parseTripText(tripText);
+      setTripErrors(errors);
+      setTripParsedCount(parsed.length);
+      if (errors.length > 0) return;
+      setTrips(parsed);
+      setCalculating(true);
+      setTimeout(() => {
+        setCalculating(false);
+        setAnimKey(k => k + 1);
+        setStep(1);
+        scrollToTop();
+      }, 700);
+      return;
+    }
+
+    setCalculating(true);
+    setTimeout(() => {
+      setCalculating(false);
+      setAnimKey(k => k + 1);
+      setStep(1);
+      scrollToTop();
+    }, 700);
+  };
+
+  useAutoResize();
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: T.subtle }}>
+      {/* Body */}
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: mobile ? '20px 14px 48px' : '32px 20px 60px' }}>
+        <div style={{ width: '100%', maxWidth: 620, margin: '0 auto' }}>
+          <Steps step={step} />
+
+          {/* ── CALCULATING ── */}
+          {calculating && (
+            <div style={{ animation: 'fadeUp 0.2s ease-out both', textAlign: 'center', padding: '60px 20px' }}>
+              <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+                <div style={{
+                  width: 56, height: 56, borderRadius: '50%',
+                  border: `3px solid ${T.border}`,
+                  borderTopColor: T.mint,
+                  animation: 'spin 0.7s linear infinite',
+                }} />
+                <div style={{ fontSize: 15, fontWeight: 700, color: T.ink }}>Calculating…</div>
+                <div style={{ fontSize: 12, color: T.muted }}>Projecting your residency status</div>
+              </div>
+            </div>
+          )}
+
+          {/* ── INPUT ── */}
+          {!calculating && step === 0 && (
+            <div key="input" style={{ animation: 'fadeUp 0.35s ease-out both' }}>              <div style={{ background: T.paper, borderRadius: 20, border: `1.5px solid ${T.border}`, padding: mobile ? '20px 16px 18px' : '28px 22px 24px', marginBottom: 12 }}>
+                <h2 style={{ fontSize: 20, fontWeight: 700, color: T.ink, marginBottom: 6, lineHeight: 1.3 }}>
+                  When are you returning to India?
+                </h2>
+                <p style={{ fontSize: 12, color: T.mutedDark, marginBottom: 22, lineHeight: 1.7 }}>
+                  We'll project your residency status — NR, RNOR, or ROR — for the 5 financial years after you return.
+                </p>
+
+                <label style={{ fontSize: 11, fontWeight: 700, color: T.mutedDark, letterSpacing: 0.5, display: 'block', marginBottom: 7, textTransform: 'uppercase' }}>
+                  Date you left India permanently
+                </label>
+                <input type="date" value={departureDate} onChange={e => setDepartureDate(e.target.value)}
+                  style={{
+                    padding: '12px 14px', border: `1.5px solid ${dateOrderError ? T.red : T.border}`, borderRadius: 11,
+                    fontSize: 15, fontFamily: F.body, color: T.ink, background: T.paper,
+                    outline: 'none', width: '100%', marginBottom: 6,
+                  }}
+                  onFocus={e => e.target.style.borderColor = dateOrderError ? T.red : T.mint}
+                  onBlur={e => e.target.style.borderColor = dateOrderError ? T.red : T.border}
+                />
+                {dateOrderError ? (
+                  <div style={{ fontSize: 11, color: T.red, marginBottom: 16 }}>Departure must be before your return date.</div>
+                ) : (
+                  <div style={{ fontSize: 11, color: T.muted, marginBottom: 16, lineHeight: 1.5 }}>
+                    The date you moved abroad. This is critical — years before this date count as Resident in the look-back.
+                  </div>
+                )}
+
+                <label style={{ fontSize: 11, fontWeight: 700, color: T.mutedDark, letterSpacing: 0.5, display: 'block', marginBottom: 7, textTransform: 'uppercase' }}>
+                  Expected Return Date
+                </label>
+                <input type="date" value={returnDate} onChange={e => setReturnDate(e.target.value)}
+                  style={{
+                    padding: '12px 14px', border: `1.5px solid ${T.border}`, borderRadius: 11,
+                    fontSize: 15, fontFamily: F.body, color: T.ink, background: T.paper,
+                    outline: 'none', width: '100%', marginBottom: 22,
+                  }}
+                  onFocus={e => e.target.style.borderColor = T.mint}
+                  onBlur={e => e.target.style.borderColor = T.border}
+                />
+
+                <div style={{ height: 1, background: T.border, marginBottom: 20 }}></div>
+
+                {/* Above 15L Income */}
+
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: T.mutedDark,
+                    letterSpacing: 0.5,
+                    display: 'block',
+                    marginBottom: 8,
+                    textTransform: 'uppercase'
+                  }}>
+                    Is your Indian income above ₹15L?
+                  </label>
+
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      onClick={() => setIncomeAbove15L(true)}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: 10,
+                        border: `1.5px solid ${incomeAbove15L ? T.mint : T.border}`,
+                        background: incomeAbove15L ? T.mintSoft : T.paper,
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Yes
+                    </button>
+
+                    <button
+                      onClick={() => setIncomeAbove15L(false)}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: 10,
+                        border: `1.5px solid ${!incomeAbove15L ? T.mint : T.border}`,
+                        background: !incomeAbove15L ? T.mintSoft : T.paper,
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      No
+                    </button>
+                  </div>
+                </div>
+
+                {/* Above 15L Income */}
+
+                {/* Advanced Mode */}
+
+                <div style={{ marginBottom: 20 }}>
+                  <label>Are you an Indian citizen?</label>
+                  <button onClick={() => setIsIndianCitizen(true)}>Yes</button>
+                  <button onClick={() => setIsIndianCitizen(false)}>No</button>
+                </div>
+
+                <div style={{ marginBottom: 20 }}>
+                  <label>Are you a Person of Indian Origin (PIO)?</label>
+                  <button onClick={() => setIsPIO(true)}>Yes</button>
+                  <button onClick={() => setIsPIO(false)}>No</button>
+                </div>
+
+                <div style={{ marginBottom: 20 }}>
+                  <label>Did you leave India for employment?</label>
+                  <button onClick={() => setLeftForEmployment(true)}>Yes</button>
+                  <button onClick={() => setLeftForEmployment(false)}>No</button>
+                </div>
+
+                <div style={{ marginBottom: 20 }}>
+                  <label>Are you a crew member?</label>
+                  <button onClick={() => setIsCrew(true)}>Yes</button>
+                  <button onClick={() => setIsCrew(false)}>No</button>
+                </div>
+
+                <div style={{ marginBottom: 20 }}>
+                  <label>Are you visiting India?</label>
+                  <button onClick={() => setIsVisitingIndia(true)}>Yes</button>
+                  <button onClick={() => setIsVisitingIndia(false)}>No</button>
+                </div>
+
+                <div style={{ marginBottom: 20 }}>
+                  <label>Are you not taxed in any country?</label>
+                  <button onClick={() => setNotTaxedAnywhere(true)}>Yes</button>
+                  <button onClick={() => setNotTaxedAnywhere(false)}>No</button>
+                </div>
+
+                {/* Advanced Mode */}
+
+              </div>
+
+              <button onClick={handleCalculate} disabled={!canProceed}
+                style={{
+                  width: '100%', padding: '15px', background: canProceed ? T.ink : T.border,
+                  color: T.paper, border: 'none', borderRadius: 14, fontSize: 15,
+                  fontWeight: 700, cursor: canProceed ? 'pointer' : 'default',
+                  transition: 'all 0.2s', letterSpacing: 0.2,
+                  boxShadow: canProceed ? '0 4px 14px rgba(0,0,0,0.18)' : 'none',
+                }}
+                onMouseOver={e => { if (canProceed) e.currentTarget.style.background = '#2a2a2a'; }}
+                onMouseOut={e => { if (canProceed) e.currentTarget.style.background = T.ink; }}
+              >
+                Calculate My Status →
+              </button>
+            </div>
+          )}
+
+          {/* ── OUTPUT ── */}
+          {!calculating && step === 1 && result && (
+            <div key={'out-' + animKey} style={{ animation: 'fadeUp 0.35s ease-out both' }}>
+
+              {/* Hero RNOR count — compact so opt card is visible above fold */}
+              <div style={{
+                background: rnorCount > 0 ? T.ink : T.subtle,
+                borderRadius: 20, padding: mobile ? '16px 20px' : '20px 32px',
+                marginBottom: 12, textAlign: 'center',
+                border: rnorCount > 0 ? 'none' : `1.5px solid ${T.border}`,
+                boxShadow: rnorCount > 0 ? '0 6px 24px rgba(0,0,0,0.16)' : 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: mobile ? 14 : 20,
+              }}>
+                <div style={{ fontSize: mobile ? 56 : 72, fontWeight: 700, lineHeight: 1, color: rnorCount > 0 ? T.mint : T.border, flexShrink: 0 }}>
+                  {rnorCount}
+                </div>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: rnorCount > 0 ? 'rgba(255,255,255,0.4)' : T.muted, marginBottom: 4 }}>
+                    RNOR Benefit Period
+                  </div>
+                  <div style={{ fontSize: mobile ? 14 : 16, fontWeight: 700, color: rnorCount > 0 ? 'rgba(255,255,255,0.9)' : T.mutedDark, lineHeight: 1.3 }}>
+                    {rnorCount > 0 ? `financial year${rnorCount > 1 ? 's' : ''} of RNOR` : 'No RNOR benefit'}
+                  </div>
+                  <div style={{ fontSize: 11, color: rnorCount > 0 ? 'rgba(255,255,255,0.45)' : T.muted, marginTop: 4, lineHeight: 1.5 }}>
+                    {rnorCount > 0 ? 'Foreign income stays tax-free during this window' : 'All worldwide income taxable from year of return'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Year-by-year badges */}
+              <div style={{ background: T.paper, borderRadius: 20, border: `1.5px solid ${T.border}`, padding: mobile ? '20px 16px 24px' : '28px 28px 32px', marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: T.muted, marginBottom: 6 }}>
+                  Year-by-Year Outlook
+                </div>
+                <div style={{ fontSize: 13, color: T.mutedDark, marginBottom: 24, lineHeight: 1.5 }}>
+                  Starting from <strong>{fyLabel(fiveYearStatus[0]?.endYear) || '—'}</strong>, the financial year you return
+                </div>
+                <div style={{ display: 'flex', gap: mobile ? 6 : 12 }}>
+                  {fiveYearStatus.map(fy => (
+                    <StatusBadge key={fy.label} status={fy.status} label={fyLabel(fy.endYear).replace('FY ', '')} mobile={mobile} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Optimisations — always shown */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: T.mutedDark, marginBottom: 12, paddingLeft: 2 }}>
+                  💡 {showOptimisations ? (effectiveOptCount === 1 ? "Here's how you can optimise" : 'You can do better — 2 options') : 'Optimisation'}
+                </div>
+                {alreadyOptimal ? (
+                  <div style={{ background: T.mintSoft, border: `1.5px solid ${T.mint}`, borderRadius: 16, padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 20 }}>🎯</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#0D5C4A', marginBottom: 4 }}>You already get the best possible outcome</div>
+                      <div style={{ fontSize: 12, color: T.mutedDark, lineHeight: 1.6 }}>Your chosen return date gives you the maximum RNOR benefit. No adjustment needed.</div>
+                    </div>
+                  </div>
+                ) : showOptimisations ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
+                    {opt1 && (
+                      <OptCard
+                        tag={effectiveOptCount > 1 ? 'Option A — Delay slightly' : 'Optimisation'}
+                        tagColor={T.teal} tagBg={T.tealSoft}
+                        headline={`${opt1.rnorCount} full RNOR years`}
+                        date={formatDateReadable(opt1.date)}
+                        subtext={`${opt1.shift} day${opt1.shift > 1 ? 's' : ''} later. Return year still qualifies as RNOR — one extra year of foreign income tax-free.`}
+                        miniStatuses={opt1Statuses}
+                      />
+                    )}
+                    {showOpt2 && opt2 && (
+                      <OptCard
+                        tag="Option B — Skip the partial year"
+                        tagColor={T.violet} tagBg={T.violetSoft}
+                        headline="2 clean full RNOR years"
+                        date={formatDateReadable(opt2.date)}
+                        subtext={`Return year becomes NR (arrive too late to be resident). Next 2 full years are both RNOR — no partial-year messiness.`}
+                        miniStatuses={opt2Statuses}
+                      />
+                    )}
+                  </div>
+                ) : rnorCount === 0 ? (
+                  <div style={{ background: T.amberSoft, border: `1.5px solid ${T.amber}`, borderRadius: 16, padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 20 }}>⚠️</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: T.amber, marginBottom: 4 }}>No RNOR window found</div>
+                      <div style={{ fontSize: 12, color: T.mutedDark, lineHeight: 1.6 }}>Based on your dates, you may not qualify for RNOR. This typically happens when you moved abroad recently and still have several Resident years in the 7–10 year look-back. A Turtle advisor can review your exact history.</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ background: T.paper, border: `1.5px solid ${T.border}`, borderRadius: 16, padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 20 }}>✅</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: T.ink, marginBottom: 4 }}>No further optimisation available</div>
+                      <div style={{ fontSize: 12, color: T.muted, lineHeight: 1.6 }}>Your chosen return date is already as good as it gets for this travel history. Shifting it further doesn't improve your RNOR window.</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Note */}
+              <div style={{ borderRadius: 14, border: `1px solid ${T.border}`, padding: mobile ? '14px 16px' : '16px 20px', marginBottom: 16, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>ℹ️</span>
+                <div style={{ fontSize: 12, color: T.mutedDark, lineHeight: 1.8 }}>
+                  This is an estimate based on average values. For your exact RNOR period calculation, your exact travel history over the past 7 financial years would be required, based on immigration stamps.
+                </div>
+              </div>
+
+              {/* CTA */}
+              <div style={{ display: 'flex', flexDirection: mobile ? 'column' : 'row', gap: 10 }}>
+                <button onClick={() => setStep(0)} style={{
+                  padding: '15px 20px', background: T.paper, color: T.ink,
+                  border: `1.5px solid ${T.border}`, borderRadius: 14,
+                  fontSize: 13, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s',
+                  order: mobile ? 1 : 0, flexShrink: 0,
+                }}
+                  onMouseOver={e => e.currentTarget.style.borderColor = T.ink}
+                  onMouseOut={e => e.currentTarget.style.borderColor = T.border}
+                >
+                  ← Recalculate
+                </button>
+                <a href="https://www.turtlefinance.in/karma-conversation"
+                  target="_blank" rel="noopener noreferrer"
+                  style={{
+                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '15px 24px', background: T.ink, color: T.paper,
+                    borderRadius: 14, fontSize: mobile ? 14 : 15, fontWeight: 700,
+                    textDecoration: 'none', transition: 'background 0.2s',
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.18)',
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = '#2a2a2a'}
+                  onMouseOut={e => e.currentTarget.style.background = T.ink}
+                >
+                  Talk to a Turtle Expert →
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div style={{ padding: '16px 20px', textAlign: 'center', fontSize: 10, color: T.muted }}>
+        © {new Date().getFullYear()} Turtle Finance ·&nbsp;
+        <a href="https://www.turtlefinance.in" target="_blank" rel="noopener noreferrer" style={{ color: T.muted, textDecoration: 'none' }}>turtlefinance.in</a>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
