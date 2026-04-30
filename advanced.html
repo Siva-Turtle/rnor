@@ -939,43 +939,305 @@ function App() {
 
                 {/* Above 15L Income */}
 
-                {/* Advanced Mode */}
+                {/* Are you an Indian citizen? */}
 
                 <div style={{ marginBottom: 20 }}>
-                  <label>Are you an Indian citizen?</label>
-                  <button onClick={() => setIsIndianCitizen(true)}>Yes</button>
-                  <button onClick={() => setIsIndianCitizen(false)}>No</button>
+                  <label style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: T.mutedDark,
+                    letterSpacing: 0.5,
+                    display: 'block',
+                    marginBottom: 8,
+                    textTransform: 'uppercase'
+                  }}>
+                    Are you an Indian citizen?
+                  </label>
+
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      onClick={() => setIsIndianCitizen(true)}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: 10,
+                        border: `1.5px solid ${incomeAbove15L ? T.mint : T.border}`,
+                        background: incomeAbove15L ? T.mintSoft : T.paper,
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Yes
+                    </button>
+
+                    <button
+                      onClick={() => setIsIndianCitizen(false)}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: 10,
+                        border: `1.5px solid ${!incomeAbove15L ? T.mint : T.border}`,
+                        background: !incomeAbove15L ? T.mintSoft : T.paper,
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      No
+                    </button>
+                  </div>
                 </div>
 
-                <div style={{ marginBottom: 20 }}>
-                  <label>Are you a Person of Indian Origin (PIO)?</label>
-                  <button onClick={() => setIsPIO(true)}>Yes</button>
-                  <button onClick={() => setIsPIO(false)}>No</button>
-                </div>
+                {/* Are you an Indian citizen? */}
+
+                {/* Are you a Person of Indian Origin (PIO)? */}
 
                 <div style={{ marginBottom: 20 }}>
-                  <label>Did you leave India for employment?</label>
-                  <button onClick={() => setLeftForEmployment(true)}>Yes</button>
-                  <button onClick={() => setLeftForEmployment(false)}>No</button>
+                  <label style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: T.mutedDark,
+                    letterSpacing: 0.5,
+                    display: 'block',
+                    marginBottom: 8,
+                    textTransform: 'uppercase'
+                  }}>
+                    Are you a Person of Indian Origin (PIO)?
+                  </label>
+
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      onClick={() => setIsPIO(true)}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: 10,
+                        border: `1.5px solid ${incomeAbove15L ? T.mint : T.border}`,
+                        background: incomeAbove15L ? T.mintSoft : T.paper,
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Yes
+                    </button>
+
+                    <button
+                      onClick={() => setIsPIO(false)}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: 10,
+                        border: `1.5px solid ${!incomeAbove15L ? T.mint : T.border}`,
+                        background: !incomeAbove15L ? T.mintSoft : T.paper,
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      No
+                    </button>
+                  </div>
                 </div>
 
-                <div style={{ marginBottom: 20 }}>
-                  <label>Are you a crew member?</label>
-                  <button onClick={() => setIsCrew(true)}>Yes</button>
-                  <button onClick={() => setIsCrew(false)}>No</button>
-                </div>
+                {/* Are you a Person of Indian Origin (PIO)? */}
+
+                {/* Did you leave India for employment? */}
 
                 <div style={{ marginBottom: 20 }}>
-                  <label>Are you visiting India?</label>
-                  <button onClick={() => setIsVisitingIndia(true)}>Yes</button>
-                  <button onClick={() => setIsVisitingIndia(false)}>No</button>
+                  <label style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: T.mutedDark,
+                    letterSpacing: 0.5,
+                    display: 'block',
+                    marginBottom: 8,
+                    textTransform: 'uppercase'
+                  }}>
+                    Did you leave India for employment?
+                  </label>
+
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      onClick={() => setLeftForEmployment(true)}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: 10,
+                        border: `1.5px solid ${incomeAbove15L ? T.mint : T.border}`,
+                        background: incomeAbove15L ? T.mintSoft : T.paper,
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Yes
+                    </button>
+
+                    <button
+                      onClick={() => setLeftForEmployment(false)}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: 10,
+                        border: `1.5px solid ${!incomeAbove15L ? T.mint : T.border}`,
+                        background: !incomeAbove15L ? T.mintSoft : T.paper,
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      No
+                    </button>
+                  </div>
                 </div>
 
+                {/* Did you leave India for employment? */}
+
+                {/* Are you a crew member? */}
+
                 <div style={{ marginBottom: 20 }}>
-                  <label>Are you not taxed in any country?</label>
-                  <button onClick={() => setNotTaxedAnywhere(true)}>Yes</button>
-                  <button onClick={() => setNotTaxedAnywhere(false)}>No</button>
+                  <label style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: T.mutedDark,
+                    letterSpacing: 0.5,
+                    display: 'block',
+                    marginBottom: 8,
+                    textTransform: 'uppercase'
+                  }}>
+                    Are you a crew member working on a Ship or an Aircraft?
+                  </label>
+
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      onClick={() => setIsCrew(true)}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: 10,
+                        border: `1.5px solid ${incomeAbove15L ? T.mint : T.border}`,
+                        background: incomeAbove15L ? T.mintSoft : T.paper,
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Yes
+                    </button>
+
+                    <button
+                      onClick={() => setIsCrew(false)}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: 10,
+                        border: `1.5px solid ${!incomeAbove15L ? T.mint : T.border}`,
+                        background: !incomeAbove15L ? T.mintSoft : T.paper,
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      No
+                    </button>
+                  </div>
                 </div>
+
+                {/* Are you a crew member? */}
+
+                {/* Are you visiting India? */}
+
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: T.mutedDark,
+                    letterSpacing: 0.5,
+                    display: 'block',
+                    marginBottom: 8,
+                    textTransform: 'uppercase'
+                  }}>
+                    Are you visiting India?
+                  </label>
+
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      onClick={() => setIsVisitingIndia(true)}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: 10,
+                        border: `1.5px solid ${incomeAbove15L ? T.mint : T.border}`,
+                        background: incomeAbove15L ? T.mintSoft : T.paper,
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Yes, I am just visiting.
+                    </button>
+
+                    <button
+                      onClick={() => setIsVisitingIndia(false)}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: 10,
+                        border: `1.5px solid ${!incomeAbove15L ? T.mint : T.border}`,
+                        background: !incomeAbove15L ? T.mintSoft : T.paper,
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      No, I am returning to India.
+                    </button>
+                  </div>
+                </div>
+
+                {/* Are you visiting India? */}
+
+                {/* Are you taxed in any country? */}
+
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: T.mutedDark,
+                    letterSpacing: 0.5,
+                    display: 'block',
+                    marginBottom: 8,
+                    textTransform: 'uppercase'
+                  }}>
+                    Are you taxed in any country other than India?
+                  </label>
+
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      onClick={() => setNotTaxedAnywhere(false)}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: 10,
+                        border: `1.5px solid ${incomeAbove15L ? T.mint : T.border}`,
+                        background: incomeAbove15L ? T.mintSoft : T.paper,
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Yes
+                    </button>
+
+                    <button
+                      onClick={() => setNotTaxedAnywhere(true)}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: 10,
+                        border: `1.5px solid ${!incomeAbove15L ? T.mint : T.border}`,
+                        background: !incomeAbove15L ? T.mintSoft : T.paper,
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      No
+                    </button>
+                  </div>
+                </div>
+
+                {/* Are you taxed in any country? */}
 
                 {/* Advanced Mode */}
 
