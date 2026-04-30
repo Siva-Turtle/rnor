@@ -1,177 +1,275 @@
-// ---------- RNOR Calculation Engine ----------
+// ---------- RNOR ENGINE (DUAL MODE: APPROX + ACCURATE) ----------
+
 const MS_PER_DAY = 86400000;
 
+// ---------- DATE UTILS (UTC SAFE) ----------
 function parseDate(s) {
   if (!s) return null;
-  const parts = s.split('-').map(Number);
-  if (parts.length !== 3 || parts.some(isNaN)) return null;
-  const [y, m, d] = parts;
-  return new Date(y, m - 1, d);
+  const [y, m, d] = s.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(Date.UTC(y, m - 1, d));
 }
 
-function fyEndingYear(dateObj) {
-  const m = dateObj.getMonth() + 1;
-  const y = dateObj.getFullYear();
+function daysBetweenInclusive(start, end) {
+  return Math.floor((end - start) / MS_PER_DAY) + 1;
+}
+
+function fyEndingYear(date) {
+  const m = date.getUTCMonth() + 1;
+  const y = date.getUTCFullYear();
   return m < 4 ? y : y + 1;
 }
 
-function daysInIndiaForTrip(tripIn, tripOut, fyStart, fyEnd) {
-  const start = tripIn > fyStart ? tripIn : fyStart;
-  const end = tripOut < fyEnd ? tripOut : fyEnd;
-  if (end < start) return 0;
-  return Math.round((end - start) / MS_PER_DAY) + 1;
+function fyBounds(endYear) {
+  return {
+    start: new Date(Date.UTC(endYear - 1, 3, 1)),
+    end: new Date(Date.UTC(endYear, 2, 31))
+  };
 }
 
-// departureDate: the date the person LEFT India to live abroad (Date object or null)
-// Pre-departure FYs are treated as 365 days (person was living in India).
-// The departure FY itself counts days from Apr 1 of that FY to the departure date.
-// Post-departure, pre-return FYs use avgDays / customDays / trip-derived days.
-function buildTimeline(returnDate, yearOfReturn, avgDays, ctc, passive, advancedMode, customDays, departureDate) {
-  const depFyEndYear = departureDate ? fyEndingYear(departureDate) : null;
-
+// ---------- CORE TIMELINE ----------
+function buildTimeline({
+  returnDate,
+  departureDate,
+  yearOfReturn,
+  mode,        // "avg" | "custom" | "trips"
+  avgDays,
+  customDays,
+  trips
+}) {
   const fys = [];
-  for (let i = 0; i < 15; i++) {
-    const endYear = yearOfReturn - 7 + i;
-    const startYear = endYear - 1;
-    const fyEndDate = new Date(endYear, 2, 31);
-    const fyStartDate = new Date(startYear, 3, 1);
-    const label = `FY ${String(startYear).slice(-2)}-${String(endYear).slice(-2)}`;
 
-    let days;
+  for (let i = 0; i < 20; i++) {
+    const endYear = yearOfReturn - 10 + i;
+    const { start, end } = fyBounds(endYear);
+
+    let days = 0;
+
+    // ---------- PRE-RETURN YEARS ----------
     if (endYear < yearOfReturn) {
-      if (departureDate && depFyEndYear !== null) {
-        if (endYear < depFyEndYear) {
-          // Fully pre-departure: person was living in India all year
-          days = 365;
-        } else if (endYear === depFyEndYear) {
-          // Departure FY: days from FY start (Apr 1) to departure date
-          days = Math.round((departureDate - fyStartDate) / MS_PER_DAY);
-          days = Math.max(0, Math.min(365, days));
-        } else {
-          // Post-departure, pre-return: visit days
-          if (customDays && customDays[label] != null) {
-            days = customDays[label];
-          } else {
-            days = avgDays;
-          }
+
+      // Case 1: Fully before departure → lived in India
+      if (departureDate && end < departureDate) {
+        days = 365;
+      }
+
+      // Case 2: Departure year
+      else if (departureDate && start <= departureDate && end >= departureDate) {
+        days = Math.max(0, daysBetweenInclusive(start, departureDate));
+      }
+
+      // Case 3: Post-departure → use selected mode
+      else {
+
+        // -------- MODE: TRIPS --------
+        if (mode === "trips") {
+          days = (trips || []).reduce((sum, trip) => {
+            const tripIn = parseDate(trip.in);
+            const tripOut = parseDate(trip.out);
+
+            if (!tripIn || !tripOut) return sum;
+
+            const overlapStart = tripIn > start ? tripIn : start;
+            const overlapEnd = tripOut < end ? tripOut : end;
+
+            if (overlapEnd < overlapStart) return sum;
+
+            return sum + daysBetweenInclusive(overlapStart, overlapEnd);
+          }, 0);
         }
-      } else {
-        // No departure date: backward-compatible avg/custom for all pre-return years
-        if (customDays && customDays[label] != null) {
-          days = customDays[label];
-        } else {
-          days = avgDays;
+
+        // -------- MODE: CUSTOM FY --------
+        else if (mode === "custom") {
+          // STRICT: missing FY = 0
+          days = customDays?.[endYear] ?? 0;
+        }
+
+        // -------- MODE: AVG --------
+        else {
+          days = avgDays ?? 0;
         }
       }
-    } else if (endYear === yearOfReturn) {
-      // Return FY: days from return date to Mar 31
-      days = Math.round((fyEndDate - returnDate) / MS_PER_DAY);
-      if (days < 0) days = 0;
-    } else {
-      // Post-return: living in India full time
+    }
+
+    // ---------- RETURN YEAR ----------
+    else if (endYear === yearOfReturn) {
+      days = Math.max(0, daysBetweenInclusive(returnDate, end));
+    }
+
+    // ---------- POST-RETURN ----------
+    else {
       days = 365;
     }
 
     fys.push({
-      idx: i, endYear, startYear, fyEndDate, fyStartDate, label,
-      yearsFromReturn: endYear - yearOfReturn,
-      isReturnYear: endYear === yearOfReturn,
-      isPreReturn: endYear < yearOfReturn,
-      daysInIndia: days,
+      endYear,
+      daysInIndia: Math.max(0, Math.min(366, days))
     });
   }
 
-  // Cumulative India days over the preceding 7 FYs (for the 729-day RNOR test)
+  return fys;
+}
+
+// ---------- HELPERS ----------
+function computePastDays(fys, index, years) {
+  return fys
+    .slice(Math.max(0, index - years), index)
+    .reduce((sum, fy) => sum + fy.daysInIndia, 0);
+}
+
+function computePrevResidents(fys, index, years) {
+  return fys
+    .slice(Math.max(0, index - years), index)
+    .filter(f => f.residentStatus === 'R').length;
+}
+
+// ======================================================
+// =============== APPROXIMATION MODEL ===================
+// ======================================================
+
+function calculateApproximation({
+  returnDateStr,
+  departureDateStr,
+  mode, // "avg" | "custom" | "trips"
+  avgDays,
+  customDays,
+  trips,
+  incomeAbove15L
+}) {
+  const returnDate = parseDate(returnDateStr);
+  const departureDate = parseDate(departureDateStr);
+
+  const yearOfReturn = fyEndingYear(returnDate);
+
+  const fys = buildTimeline({
+    returnDate,
+    departureDate,
+    yearOfReturn,
+    mode,
+    avgDays,
+    customDays,
+    trips
+  });
+
   fys.forEach((fy, i) => {
-    if (i >= 7) fy.past7Days = fys.slice(i - 7, i).reduce((a, b) => a + b.daysInIndia, 0);
-    else if (i === 0) fy.past7Days = 0;
-    else fy.past7Days = fys[i - 1].past7Days + fys[i - 1].daysInIndia;
-  });
-
-  // Cumulative India days over the preceding 4 FYs (for 60-day Resident test)
-  fys.forEach((fy, i) => {
-    if (i >= 4) fy.past4Days = fys.slice(i - 4, i).reduce((a, b) => a + b.daysInIndia, 0);
-    else fy.past4Days = fys.slice(0, i).reduce((a, b) => a + b.daysInIndia, 0);
-  });
-
-  const divFactor = 0.7 / 365;
-  fys.forEach(fy => {
-    fy.activeIncome = yearOfReturn < fy.endYear ? 0 : ctc * fy.daysInIndia * divFactor;
-    fy.passiveIncome = passive;
-  });
-
-  // Resident / NR per FY
-  // Primary rule for NRIs: 182+ days in the FY = Resident.
-  // 120-day rule applies if India-sourced income >= 15L.
-  // 60-day rule (advanced mode) if past 4 years total >= 365 days.
-  fys.forEach(fy => {
     const d = fy.daysInIndia;
-    const totalIncome = fy.activeIncome + fy.passiveIncome;
+    const past4 = computePastDays(fys, i, 4);
+
     let isResident = false;
+
     if (d >= 182) isResident = true;
-    else if (d >= 120 && totalIncome >= 15) isResident = true;
-    else if (advancedMode && d >= 60 && fy.past4Days >= 365) isResident = true;
+    else if (d >= 120 && incomeAbove15L) isResident = true;
+    else if (d >= 60 && past4 >= 365) isResident = true;
+
     fy.residentStatus = isResident ? 'R' : 'NR';
   });
 
-  // Count R years in the preceding 10 FYs (for the "NR in 9 of 10" RNOR test)
   fys.forEach((fy, i) => {
-    const slice = fys.slice(Math.max(0, i - 10), i);
-    fy.prev10RCount = slice.filter(f => f.residentStatus === 'R').length;
-  });
+    const past7 = computePastDays(fys, i, 7);
+    const prev10R = computePrevResidents(fys, i, 10);
 
-  // Final status: NR / RNOR / ROR
-  // A Resident is RNOR if EITHER:
-  //   (a) They were NR in 9+ of the 10 preceding FYs (prev10RCount < 2), OR
-  //   (b) They spent <= 729 days in India across the 7 preceding FYs
-  fys.forEach(fy => {
     if (fy.residentStatus === 'NR') fy.status = 'NR';
-    else if (fy.prev10RCount < 2) fy.status = 'RNOR';
-    else if (fy.past7Days < 729) fy.status = 'RNOR';
+    else if (prev10R < 2) fy.status = 'RNOR';
+    else if (past7 <= 729) fy.status = 'RNOR';
     else fy.status = 'ROR';
   });
 
   return fys;
 }
 
-function calculate(returnDateStr, avgDays, ctc, passive, advancedMode, customDays, departureDateStr) {
-  const date = parseDate(returnDateStr);
-  if (!date) return null;
-  const departureDate = departureDateStr ? parseDate(departureDateStr) : null;
-  const yearOfReturn = fyEndingYear(date);
-  const fys = buildTimeline(date, yearOfReturn, avgDays, ctc, passive, advancedMode, customDays, departureDate);
-  return { fys, yearOfReturn, returnDate: date };
-}
+// ======================================================
+// =============== ACCURATE MODEL ========================
+// ======================================================
 
-function findProposedDate(currentReturnDate, avgDays, ctc, passive, advancedMode, customDays, departureDateStr) {
-  const baseFys = calculate(
-    currentReturnDate.toISOString().split('T')[0], avgDays, ctc, passive, advancedMode, customDays, departureDateStr
-  );
-  if (!baseFys) return null;
-  const currentYoR = baseFys.yearOfReturn;
-  const currentRnorCount = baseFys.fys.filter(f => f.status === 'RNOR' && f.endYear >= currentYoR).length;
+function calculateAccurate({
+  returnDateStr,
+  departureDateStr,
+  avgDays,
+  customDays,
 
-  for (let shift = 1; shift <= 365; shift++) {
-    const newDate = new Date(currentReturnDate);
-    newDate.setDate(newDate.getDate() + shift);
-    const newYor = fyEndingYear(newDate);
-    const depDate = departureDateStr ? parseDate(departureDateStr) : null;
-    const newFys = buildTimeline(newDate, newYor, avgDays, ctc, passive, advancedMode, customDays, depDate);
-    const newRnorCount = newFys.filter(f => f.status === 'RNOR' && f.endYear >= newYor).length;
-    if (newRnorCount > currentRnorCount) {
-      return { date: newDate, additionalRnorCount: newRnorCount - currentRnorCount };
+  isIndianCitizen,
+  isPIO,
+  leftForEmployment,
+  isCrew,
+  isVisitingIndia,
+  incomeAbove15L,
+  notTaxedAnywhere
+}) {
+  const returnDate = parseDate(returnDateStr);
+  const departureDate = parseDate(departureDateStr);
+
+  const yearOfReturn = fyEndingYear(returnDate);
+
+  const fys = buildTimeline({
+    returnDate,
+    departureDate,
+    yearOfReturn,
+    avgDays,
+    customDays
+  });
+
+  fys.forEach((fy, i) => {
+    const d = fy.daysInIndia;
+    const past4 = computePastDays(fys, i, 4);
+
+    let isResident = false;
+
+    // 182-day rule
+    if (d >= 182) {
+      isResident = true;
     }
-  }
-  return null;
+
+    // 60-day rule (skip if left for employment or crew)
+    else if (!leftForEmployment && !isCrew && d >= 60 && past4 >= 365) {
+      isResident = true;
+    }
+
+    // 120-day rule (only for citizen/PIO visiting India)
+    else if (
+      (isIndianCitizen || isPIO) &&
+      isVisitingIndia &&
+      incomeAbove15L &&
+      d >= 120 &&
+      past4 >= 365
+    ) {
+      isResident = true;
+    }
+
+    // Deemed resident
+    else if (
+      isIndianCitizen &&
+      incomeAbove15L &&
+      notTaxedAnywhere
+    ) {
+      isResident = true;
+      fy.deemedResident = true;
+    }
+
+    fy.residentStatus = isResident ? 'R' : 'NR';
+  });
+
+  fys.forEach((fy, i) => {
+    const past7 = computePastDays(fys, i, 7);
+    const prev10R = computePrevResidents(fys, i, 10);
+
+    if (fy.residentStatus === 'NR') {
+      fy.status = 'NR';
+    } else if (fy.deemedResident) {
+      fy.status = 'RNOR';
+    } else if (prev10R < 2) {
+      fy.status = 'RNOR';
+    } else if (past7 <= 729) {
+      fy.status = 'RNOR';
+    } else {
+      fy.status = 'ROR';
+    }
+  });
+
+  return fys;
 }
 
-function formatDateReadable(d) {
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
-}
-
-// Export to window
+// ---------- EXPORT ----------
 Object.assign(window, {
-  parseDate, fyEndingYear, daysInIndiaForTrip, buildTimeline,
-  calculate, findProposedDate, formatDateReadable, MS_PER_DAY
+  calculateApproximation,
+  calculateAccurate
 });
