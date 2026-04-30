@@ -117,7 +117,8 @@ function buildApproxResult({
   mode,
   avgDays,
   customDays,
-  trips
+  trips,
+  incomeAbove15L
 }) {
   const fys = calculateApproximation({
     returnDateStr: returnDate,
@@ -126,7 +127,7 @@ function buildApproxResult({
     avgDays,
     customDays,
     trips,
-    incomeAbove15L: false
+    incomeAbove15L
   });
 
   return {
@@ -591,6 +592,7 @@ function App() {
   const [departureDate, setDepartureDate] = useState('');
   const [mode, setMode] = useState('avg');
   const [avgDays, setAvgDays] = useState('');
+  const [incomeAbove15L, setIncomeAbove15L] = useState(false);
   const [customDays, setCustomDays] = useState({});
 
   /* Trip text lives here so Calculate can access it */
@@ -619,14 +621,15 @@ function App() {
 
   const result = useMemo(() => {
     if (!returnDate || !departureDate) return null;
-    return buildApproxResult({
-      returnDate,
-      departureDate,
-      mode,
-      avgDays: ad,
-      customDays: customForMode,
-      trips: tripsForMode
-    });
+      return buildApproxResult({
+        returnDate,
+        departureDate,
+        mode,
+        avgDays: ad,
+        customDays: customForMode,
+        trips: tripsForMode,
+        incomeAbove15L
+      });
   }, [returnDate, departureDate, mode, ad, customForMode, tripsForMode]);
 
   const fiveYearStatus = useMemo(() => {
@@ -818,6 +821,52 @@ function App() {
                 />
 
                 <div style={{ height: 1, background: T.border, marginBottom: 20 }}></div>
+
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: T.mutedDark,
+                    letterSpacing: 0.5,
+                    display: 'block',
+                    marginBottom: 8,
+                    textTransform: 'uppercase'
+                  }}>
+                    Is your Indian income above ₹15L?
+                  </label>
+
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      onClick={() => setIncomeAbove15L(true)}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: 10,
+                        border: `1.5px solid ${incomeAbove15L ? T.mint : T.border}`,
+                        background: incomeAbove15L ? T.mintSoft : T.paper,
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Yes
+                    </button>
+
+                    <button
+                      onClick={() => setIncomeAbove15L(false)}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: 10,
+                        border: `1.5px solid ${!incomeAbove15L ? T.mint : T.border}`,
+                        background: !incomeAbove15L ? T.mintSoft : T.paper,
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      No
+                    </button>
+                  </div>
+                </div>
 
                 <label style={{ fontSize: 11, fontWeight: 700, color: T.mutedDark, letterSpacing: 0.5, display: 'block', marginBottom: 7, textTransform: 'uppercase' }}>
                   How do you want to enter your past India visits?
