@@ -1115,8 +1115,8 @@ function App() {
                         flex: 1,
                         padding: '10px',
                         borderRadius: 10,
-                        border: `1.5px solid ${notTaxedAnywhere ? T.mint : T.border}`,
-                        background: notTaxedAnywhere ? T.mintSoft : T.paper,
+                        border: `1.5px solid ${!notTaxedAnywhere ? T.mint : T.border}`,
+                        background: !notTaxedAnywhere ? T.mintSoft : T.paper,
                         fontWeight: 700,
                         cursor: 'pointer'
                       }}
@@ -1130,8 +1130,8 @@ function App() {
                         flex: 1,
                         padding: '10px',
                         borderRadius: 10,
-                        border: `1.5px solid ${!notTaxedAnywhere ? T.mint : T.border}`,
-                        background: !notTaxedAnywhere ? T.mintSoft : T.paper,
+                        border: `1.5px solid ${notTaxedAnywhere ? T.mint : T.border}`,
+                        background: notTaxedAnywhere ? T.mintSoft : T.paper,
                         fontWeight: 700,
                         cursor: 'pointer'
                       }}
